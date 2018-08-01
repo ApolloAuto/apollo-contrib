@@ -1,0 +1,264 @@
+version 1.2:
+
+The APIs below are meant to be generic and are not tied to any specific CAN
+hardware. However some of the APIs are specific to Baidu CAN
+(specifically noted below) and are exposed to advanced users.
+
+1. CAN CHANNEL ACCESS:
+---------------------
+1.1)
+int
+bcan_open(uint32_t dev_index, uint32_t flags, uint64_t tx_timeout, uint64_t
+    rx_timeout, bcan_hdl_t *hdl)
+
+This call will return a logical handle 'hdl' to a physical CAN interface. The
+CAN channel is identified by 'dev_index' which should correspond to
+/dev/zcan_pio# (this dev entry name might change in future but should be
+completely transparent to user).
+'tx_timeout' is the timeout in ms for bcan_send(). Set to 0 for no timeout.
+'rx_timeout' is the timeout in ms for bcan_recv(). Set to 0 for no timeout.
+'flags' is TBD.
+
+Return value: 0 on success, error code (see Section 5) on failure.
+
+1.2)
+int
+bcan_close(bcan_hdl_t hdl)
+
+This call will close the logical handle 'hdl'.
+
+Return value: 0 on success, error code (see Section 5) on failure.
+
+1.3)
+bcan_start(bcan_hdl_t hdl)
+
+This call will initialize the channel and put it in a state ready for transmitting
+and receiving CAN frames.
+
+For Baidu CAN: This will put the card in 'NORMAL' mode.
+Return value: 0 on success, error code (see Section 5) on failure.
+
+1.4)
+bcan_stop(bcan_hdl_t hdl)
+
+This call will stop any data from being received or transmitted on this channel.
+Error counter and status registers will be reset.
+
+For Baidu CAN: This will put it in CONFIGURATION mode. Initial state after reset. Error
+counter and Status registers are reset. Cannot receive or transmit messages. Reads
+from the RX FIFO and writes to TX FIFO and HPB are ok.
+
+Return value: 0 on success, error code (see Section 5) on failure.
+
+1.5)
+const char* bcan_get_libversion(void)
+
+This call return current libbcan version as a string.
+
+======================================================
+2. CHANNEL CONFIGURATION
+------------------------
+Below bcan_id_*() APIs are a filter to receive messages from only desired CAN
+IDs. These APIs are optional. By default all CAN messages will be accepted. All
+bcan_id_*() call return 0 on success, error code (see Section 5) on failure.
+2.1)
+bcan_id_add(bcan_hdl_t hdl, uint32_t id_start, uint32_t id_end)
+
+All ids from 'id_start' to 'id_end' will be added to the receive acceptance
+filter.
+
+2.2)
+bcan_id_add_all(bcan_hdl_t hdl)
+
+All CAN messages will be accepted.
+
+2.3)
+bcan_id_remove(bcan_hdl_t hdl, uint32_t id_start, uint32_t id_end)
+
+All ids from 'id_start' to 'id_end' will be removed from the receive acceptance
+filter.
+
+2.4)
+bcan_id_remove_all(bcan_hdl_t hdl)
+
+No CAN messages will be received.
+
+2.5)
+int
+bcan_set_baudrate(bcan_hdl_t hdl, uint32_t rate)
+
+Specify 'rate' using one of the below supported values (defined in bcan.h). For
+e.g. BCAN_BAUDRATE_500K means 500Kbps.
+
+BCAN_BAUDRATE_150K
+BCAN_BAUDRATE_250K
+BCAN_BAUDRATE_500K
+BCAN_BAUDRATE_1M
+
+Return value: 0 on success, error code (see Section 5) on failure.
+
+2.6)
+int
+bcan_get_baudrate(bcan_hdl_t hdl, uint32_t *rate)
+
+This call will return the current baudrate in Kbps via 'rate'.
+Return value: 0 on success, error code (see Section 5) on failure.
+
+2.7)
+int
+bcan_set_loopback(bcan_hdl_t hdl)
+
+This API will cause all messages sent on Tx to be received on Rx. This is
+effectively a self-test mode. Note all CAN devices may not support this mode.
+
+Return value: 0 on success, error code (see Section 5) on failure.
+
+2.8)
+int
+bcan_unset_loopback(bcan_hdl_t hdl)
+
+This call will stop the loopback mode and will return the channel to normal
+operational mode.
+
+Return value: 0 on success, error code (see Section 5) on failure.
+
+==================================
+3. DATA PATH
+------------
+typedef struct bcan_msg {
+        uint32_t	bcan_msg_id; 	    // source CAN node id
+        uint8_t		bcan_msg_rsv[3];    // reserved for future
+        uint8_t		bcan_msg_datalen;   // message data length
+        uint8_t		bcan_msg_data[8];   // message data
+        struct timeval	bcan_msg_timestamp;
+} bcan_msg_t;
+
+3.1)
+int
+bcan_recv(bcan_hdl_t hdl, bcan_msg_t *buf, uint32_t num_msg)
+
+This call will return with either the requested number of messages 'num_msg' or
+the number of available messages in the RX FIFO, which ever is smaller. If Rx
+FIFO is empty this function will block until at least one message is received.
+The 'rx_timeout' value specified in bcan_open() will be enforced by this call.
+Caller is responsible for making sure 'buf' contains enough space for the requested
+number of messages. 'num_msg' should not exceed BCAN_MAX_RX_MSG.
+
+On success this call will return the number of messages received. A error code
+(see Section 5) is returned on failure.
+
+3.2)
+int
+bcan_send(bcan_hdl_t hdl, bcan_msg_t *buf, uint32_t num_msg)
+
+'num_msg' is the number of CAN messages to be sent. 'num_msg' should not exceed
+BCAN_MAX_TX_MSG. The 'tx_timeout' specified in bcan_open() will be enforced by
+this call.
+
+Return value: On success this call will return the number of messages transmitted.
+Note that success does not mean message was put on the bus, it simply means message
+has been enqueued in the Tx FIFO.  A error code (see Section 5) is returned on
+failure.
+
+3.3)
+int
+bcan_send_hi_pri(bcan_hdl_t hdl, bcan_msg_t *buf);
+Baidu CAN CAN specific. Only 1 high priority message can be sent at a time.
+'tx_timeout' specified in bcan_open() does not apply to this call. Instead this
+call will return immediately with either success or failure.
+
+Return value: On success this call will return the number of messages transmitted
+which is 1. A error code (see Section 5) is returned on failure.
+
+=====================================
+4. DIAGNOSTIC:
+-------------
+Baidu CAN CAN specific
+4.1)
+int
+bcan_get_status(bcan_hdl_t hdl)
+
+This call will return the overall status of the channel hardware. A error code
+(defined in section 5) is returned on error.
+
+The following macros are available to retrieve specific fields in the Status
+register, 'value' is the return value from bcan_get_status().
+
+BCAN_GET_FIFO_STATUS(value) -> returns Acceptance filter status, Tx FIFO and
+	High Priority Buffer status.
+
+BCAN_GET_ERR_STATUS(value) -> returns error active, error passive or bus off
+	state.
+
+BCAN_GET_BUS_STATUS(value) -> returns Busy or Idle
+
+BCAN_GET_MODE_STATUS(value) -> returns Normal, Sleep, Loopback, Configuration
+
+
+4.2)
+int
+bcan_get_err_counter(bcan_hdl_t hdl, uint8_t *rx_err_counter, uint8_t *tx_err_counter)
+
+After this call 'rx_err_counter' and 'tx_err_counter' will contain the
+respective values from the Error Count register. These values are a indicator
+of the health of the CAN controller and bus.
+
+Return value: 0 on success, error code (see Section 5) on failure.
+
+
+================================================
+5. Version & Build Info
+
+New in 1.2. See tools/bcan/can_app.c for usage examples.
+
+- Returns bcan library version; e.g., "1.2".
+    const char *bcan_get_libversion(void)
+
+- Returns detailed bcan library build info.
+    const char *bcan_bld_info(void);
+
+- Returns brief bcan library build info.
+    const char *bcan_bld_info_short(void);
+
+
+================================================
+6. Error codes
+
+API (new in 1.2):
+
+- Returns error message corresponding to the given error code.
+    const char *bcan_get_err_msg(int err_code);
+
+List of error code; all values below are negative.
+
+- BCAN_HDL_INVALID
+	Handle is not valid.
+
+- BCAN_DEV_INVALID
+	Device is not in a suitable state for this operation. For e.g. calling
+bcan_send() without calling bcan_start().
+
+- BCAN_DEV_ERR
+	Device has entered a error state. For e.g. bcan_send() can fail if
+device has entered 'Bus Off' state.
+
+- BCAN_DEV_BUSY
+	Device is busy, re-try after some time. For e.g. setting loopback mode
+when device is actively transmitting or receiving in normal mode.
+
+- BCAN_NOT_SUPPORTED
+	Operation not supported
+
+- BCAN_NOT_IMPLEMENTED
+	Operation not implemented.
+
+- BCAN_PARAM_INVALID
+	One or more of the input parameters (other than the handle) is not valid.
+
+- BCAN_NO_BUFFERS
+	Either a hardware or software buffer is not available for this
+operation. For e.g. bcan_send() could fail if Tx hardware/software resources
+are all occupied.
+
+- BCAN_ERR
+	Catch-all error
