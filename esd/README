@@ -1,0 +1,809 @@
+Driver for esd CAN_CARDS              Version > 3.10.0              20.08.2015
+------------------------------------------------------------------------------
+
+Table of Contents
+------------------
+
+0) Introduction
+
+1) File-List
+
+2) Card-ID's and default driver-parameters
+
+3) Installation
+
+3.b) Alternate installation using DKMS
+
+4) Driver parameters
+
+5) Driver's thread priorities
+
+6) CAN-API
+
+7) Sample-Programm "cantest"
+
+8) Binary incompatibilities on libntcan level   !!!!!!!!!!!!
+
+9) Known Issues
+
+
+***************
+0) Introduction
+***************
+
+The files contained in this archive belong to esd's new CAN-driver.
+It is developed with a wide variety of operating-systems and architectures
+in mind and is flexible enough to meet the requirements of future
+CAN-protocols.
+
+Attention must be paid if you are upgrading from older drivers with version
+numbers below 3.0.0 (e.g. 2.5.x). With version 3.0.0 esd now supports an
+additional dynamic version of the ntcan API library. It is recommended to link
+applications against the new dynamic library. If you want to use an application
+that has been linked against the older static library please recompile this application
+and link against the new library.
+
+Please note:
+------------
+Linux driver is delivered in different versions, please use the correct archive.
+
+For kernels 2.4.x there're two versions, depending on the
+compiler, which was used to compile the kernel:
+
+GCC 2.X:
+esdcan-<card-id>-linux_2_4_x-<arch>-<ver>-gcc2.zip
+
+GCC 3.X:
+esdcan-<card-id>-linux_2_4_x-<arch>-<ver>-gcc3.zip
+(use this for GCC 4.X, too)
+
+For kernels 2.6.x and 3.x:
+
+On 32-Bit x86 systems:
+esdcan-<card-id>-linux_2_6_x-<arch>-<ver>.zip
+(GCC 2.x is no longer supported for kernels 2.6.x)
+
+On 64-Bit x86 systems:
+esdcan-<card-id>-linux_2_6_x-<arch>-<ver>.zip
+(GCC 2.x and kernels 2.4.x are no longer supported for 64-Bit systems)
+
+Please see section 2) for card-ids and naming scheme of driver archives.
+
+
+************
+1) File-List
+************
+
+        Example file tree for a 64-bit release. In a 32-bit only release the
+        bin64 and lib64 directories and their content is not present.
+
+        release/esdcan-isa331-linux-2.6.x-x86_64-3.10.1
+        ├── bin32
+        │   ├── cantest
+        │   └── updisa331
+        ├── bin64
+        │   ├── cantest
+        │   └── updisa331
+        ├── example
+        │   └── cantest.c
+        ├── include
+        │   └── ntcan.h
+        ├── lib32
+        │   ├── libntcan.a
+        │   └── libntcan.so.4.0.0
+        ├── lib64
+        │   ├── libntcan.a
+        │   └── libntcan.so.4.0.0
+        ├── src
+        │   ├── miscelleaneous sources ...
+        │   ├── :
+        │   :
+        ├── CHANGELOG
+        ├── config.mk
+        ├── Makefile
+        └── README
+
+
+        File          Description
+        -------------------------
+        CHANGELOG :
+                This file lists all changes and bugfixes sorted by version.
+
+        config.mk :
+                The configuration-file for the compile-process. You might need to
+                edit this file, in order to suit any peculiarities of your system.
+                (mainly the KERNELPATH, you'll see later)
+
+        Makefile :
+                Lets you build the driver without any programming-knowledge and
+                without the need to touch any of the source-files.
+
+        README :
+                This file
+
+        lib(32|64)/libntcan.a :
+                The ntcan library as static-link-library. DON'T use it unless you
+                know what you're doing!
+
+        lib(32|64)/libntcan.so.v.mv.r :
+                The ntcan library as dynamic-shared-library (.so).
+                Note on dynamic-shared-library:
+                The .so-suffix is followed by three dot-separated numbers (.v.mv.r).
+                These are version (.v), minor-version (.mv, which has _nothing_ to
+                do with a device's minor-number) and a release-number (.r).
+                Version (.v) changes, if there're incompatible changes in the
+                library's interface. We at esd think this shouldn't change at all,
+                providing you as a user with a consistent interface.
+                Minor-version (.mv) will be changed, if there are major changes in
+                functionality or additional features.
+                Bugfixes will lead to an increasing release-number (.r).
+                WARNING:  See section 8) below for a binary incompatibility issue.
+
+        include/ntcan.h :
+                Header for the ntcan-api/library
+                THIS IS THE ONLY HEADER, YOU SHOULD INCLUDE IN YOUR APPLICATIONS
+                (with the exception of irigb.h, see below).
+                PLEASE DO NOT USE ANY DEFINES LOCATED IN ANY OF THE OTHER HEADERS,
+                IN ORDER TO KEEP YOUR APPLICATIONS WORKING WITH FUTURE VERSIONS OF
+                THE DRIVER.
+
+        example/cantest.c :
+                Source of example-application
+
+        bin(32|64)/cantest :
+                The 32-bit and the 64-bit variants of cantest were built from the same
+                source file provided as example/cantest.c.
+                Binary of example-programm, see section 7) for further explanation.
+                (NOTE: cantest needs the libntcan.so, please assure, that it is able
+                to find the correct version by either following the installation-notes
+                below or setting your LD_LIBRARY_PATH-env-variable correctly. In both
+                cases you need to assure, that there's not an older version of the
+                library prior to the latest version in the library-search-path).
+
+        src/* :
+                Source / object / config files:
+                This driver is released as a combination of binary-objects (*.o)
+                and source-files (*.c and *.h). This way esd can provide a CAN-driver
+                working with many different linux-kernels. The source files are NOT
+                under the GPL!!! You're not allowed to modify, redistribute or sell
+                the files. They are intellectual property of esd-electronics GmbH.
+                BEWARE: Don't try to use any defines or data-structures located in
+                        these files in your own sources. This will lead to non-working
+                        applications in the future.
+
+
+        bin(32|64)/upd<card-id> :
+                The optional firmware update tool. With some boards this tool can be
+                used to switch between CAN-2.0-A / CAN-2.0-B firmware mode.
+
+                This tool is only delivered with boards that have an updateable
+                firmware. Such boards are for example CAN-PCIe/402, CAN-(C)PCI/331,
+                CAN-(C)PCI/360 and CAN-ISA/331.
+
+                Replace <card-id> with the appropriate card-id from the table in
+                section 2) to derive the program's name (e.g. it's called updpci331
+                for a CAN-PCI/331).
+
+                NOTE:
+                Use this tool in combination with the delivered driver, only!
+
+                This tool can also be used to switch the firmware mode of cards (only
+                (c)pci331, (c)pci360 and isa331 need such switching) between
+                CAN-2.0-A-firmware (processes CAN-messages with 11-bit-identifiers, only)
+                and CAN-2.0-B-firmware (processes both CAN-messages with 11-bit-
+                and 29-bit-identifiers) mode.
+
+                USAGE examples:
+
+                Switch a CAN-PCI/331 between 2.0a and 2.0b mode:
+                        "updpci331 -t<x> <net>"
+                        Replace <x> with "a" or "b" depending on the firmware, you
+                        want to use
+                        Replace <net> with a net-number assigned to your CAN-PCI/331
+                        NOTE: This mode switching is needed only on
+                              CAN-(C)PCI/331, CAN-(C)PCI/360 and CAN-ISA/331.
+                              It is not possible nor needed on CAN-PCIe/402.
+
+                Firmware update of a CAN-PCI/331:
+                        "updpci331 net"
+                        replace net with a net-number assigned to your CAN-PCI/331
+
+                NOTE for users of CAN-PCI/360:
+                Normally you'll use the tool as described above.
+                There's one exception: With certain old CAN-CPCI/360 boards the update might fail
+                and you end up with a CAN board with only one CAN-net.
+                For this case there's a second version of the update tool with the suffix "rt".
+                The update will take significantly longer, but this will fix the problem.
+
+
+        Only old driver releases for CAN-PCI/400 (especially PMC-CAN/400-4I) contained
+        the IRIG-B library. But current driver archives don't contain the IRIG-B libary
+        any more. It's provided as an extra download or on the CAN CD.
+        You'll only need the IRIG-B library, if you have a IRIG-B
+        capable CAN-board, like PMC-CAN/400-4I. For reference only the provided files
+        are listed below.
+
+        include/irigb.h
+                Header for the IRIG-B-API library
+
+        lib(32|64)/libirigb.so.v.mv.r
+                IRIG-B-Library as dynamic-shared-library (.so))
+                See "Note on dynamic-shared-library" on libntcan.so above.
+
+        doc/irigb_esd.html
+                API manual for IRIG-B library.
+
+
+
+******************************************
+2) Card-ID's and default driver-parameters
+******************************************
+
+Card-IDs are used in the naming scheme of driver archives.
+
+esd-can-Card(s)    card-id      major   io      irq
+-----------------------------------------------------------------
+AMC-CAN4           amc4         54      -       -
+CAN-CPCI/331       pci331       50      -       -
+CAN-PCI/331        pci331       50      -       -
+CAN-PMC/331        pci331       50      -       -
+CAN-ISA/331        isa331       52      0x1e0   5
+* CAN-USB-Mini     usb331       50      -       -       Support dropped
+CAN-PCI/360        pci360       51      -       -
+CAN-CPCI/360       pci360       51      -       -
+CAN-ISA/200        isa200       53      0x1e8   5
+CAN-CPCI/200       pci200       54      -       -
+CAN-PCI/200        pci200       54      -       -
+CAN-PCI/266        pci200       54      -       -
+CAN-CPCI/405       pci405       53      -       -
+CAN-PCI/405        pci405       53      -       -
+CAN-PC104/200-I    pc104_200i   54      0x1e8   5
+CAN-PC104/331      isa331       52      0x1e0   5
+CAN-PCI/400        esdaccbm     55      -       -
+CAN-PCIe/400       esdaccbm     55      -       -
+CPCI-CAN/400       esdaccbm     55      -       -
+PMC-CAN/400        esdaccbm     55      -       -
+CAN-PCIe/402       pcie402      52      -       -
+
+You can overwrite the defaults with the insmod-command.(See next chapter)
+
+
+***************
+3) Installation
+***************
+
+- Extract the driver from the archive:
+
+  All drivers released after July 2012 are delivered in a TGZ archive instead of
+  a password protected ZIP file.
+
+  TGZ archive
+
+        Untar the driver directory:
+
+        "tar -xzf esdcan-crd-os-arch-ver-ext.tgz"
+        with    crd  = card-id (e.g.: crd=pci200 or crd=cpci405 ...)
+                os   = host-operation-system (e.g.: os=linux-2.4.x)
+                arch = host-architecture (e.g.: arch=x86 or arch=x86_64)
+                ver  = driver version (e.g.: ver=3.7.2)
+                ext  = extension (applicable to certain cards only, e.g.: ext=gcc2)
+
+        You'll end up with a directory named as the archive.
+
+
+  ZIP archive
+
+        A1) Unzip the archive:
+
+        "unzip esdcan-crd-os-arch-ver-ext.zip"
+        with    crd  = card-id (e.g.: crd=pci200 or crd=cpci405 ...)
+                os   = host-operation-system (e.g.: os=linux-2.4.x)
+                arch = host-architecture (e.g.: arch=x86 or arch=x86_64)
+                ver  = driver version (e.g.: ver=3.7.2)
+                ext  = extension (applicable to certain cards only, e.g.: ext=gcc2)
+
+        You'll be prompted for a password.
+        Password: esdCAN2007
+
+        Resulting file:
+        "esdcan-crd-os-arch-ver-ext.tar"
+
+        A2) Untar the driver directory:
+
+        "tar -xvf esdcan-crd-os-arch-ver-ext.tar"
+        with    crd  = card-id (e.g.: crd=pci200 or crd=cpci405 ...)
+                os   = host-operation-system (e.g.: os=linux-2.4.x)
+                arch = host-architecture (e.g.: arch=x86 or arch=x86_64)
+                ver  = driver version (e.g.: ver=3.7.2)
+                ext  = extension (applicable to certain cards only, e.g.: ext=gcc2)
+
+        You'll end up with a directory named as the archive.
+
+  Alternatively the above can be accomplished in a single step:
+
+        B) Unzip and untar in a single step:
+
+        "unzip -p esdcan-crd-os-arch-ver-ext.zip | tar -xv"
+
+        You'll be prompted for a password.
+        Password: esdCAN2007
+
+
+- Compile the driver:
+
+        "cd ./esdcan-<crd>-<os>-<arch>-<ver>-<ext>"
+
+        In some cases you need to edit a configuration-file for the compilation:
+        In config.mk you need to set the variable KERNELPATH correctly.
+        Normally the default-path /usr/src/linux should be correct. If your
+        linux configration differs from the standard, correct the line accordingly:
+
+        KERNELPATH = /your-path-to-the-kernel-source
+
+        !!! NOTE FOR LINUX KERNEL > 2.6.0:
+        You might need to be "root" to compile the driver.
+
+        Compiling the driver is simple by typing:
+
+        "make"
+
+        For some card's there're warnings like "COMPILING FOR xxx". These can be ignored
+        and will be removed in future versions.
+
+        Now, you've a file called as described below, which is the actual driver-module
+        in the same directory:
+
+        esdcan-<crd>-<os>-<arch>-<kver> :
+                Dynamic loadable driver-file
+                crd  = card-id. (e.g.: crd=pci200 or crd=cpci405)
+                os   = host-operation-system. (e.g.: os=linux)
+                arch = host-architecture. (e.g.: arch=x86)
+                kver = target-version-information. (e.g.: kver=2.4.18
+                        (for linux the kernel-version is coded here,
+                        because the compiled version is kernel-specific!!!))
+
+        Example:
+        For a CAN-PCI/331 for 32-Bit-x86-Linux with 2.4.21-99-smp kernel
+        the driver file (driver version 3.6.1) is called:
+
+        "esdcan-pci331-linux-x86-3.6.1-2.4.21-99-smp"
+
+        !!! NOTE FOR LINUX KERNEL > 2.6.0:
+        The driver file is called "esdcan-<crd>.ko" and is generated inside of the "src"-
+        subdirectory.
+
+        Example:
+        For the above mentioned CAN-PCI/331 the driver file is called:
+
+        "esdcan-pci331.ko" (and is located in ./src subdirectory)
+
+- File locations:
+
+        The driver-module should be placed somewhere in /lib/modules/kernel-version/ .
+        kernel-version has to be replaced by the according string of your system,
+        which you can get by (it should be equivalent to the os-string in the
+        driver's name (see above)):
+
+        "uname -a"
+
+        The dynamic-shared-library "libntcan.so" should be placed in /usr/local/lib/ or
+        an equivalent path, which is contained in your LD_LIBRARY_PATH env-variable.
+
+        NOTE: On 64-Bit systems, there're two versions of "libntcan.so". One in ./lib32
+              and one in ./lib64. The first belongs into /usr/local/lib on most Linux
+              distributions. The later should be kept together with other 64-Bit libraries,
+              e.g. in /usr/local/lib64.
+
+        The static version of the library "libntcan.a" can be kept wherever you
+        want. Here at esd we prefer to keep it with the sources of a project, on the
+        other hand, one might like to install it with the shared-lib at /usr/local/lib/ .
+
+        Installation-note:
+        The shared library should belong to user and group root with the following
+        file access permissions: u=rwx, g=rx, o=rx
+        After installation of the library, the root-user should call:
+            "ldconfig -n /usr/local/lib" (if installed to this directory)
+        Afterwards there's a link libntcan.so.v --> libntcan.so.v.mv.r .
+        For your own convenience it is advised to generate another link in your
+        library-directory:  libntcan.so --> libntcan.so.v
+
+        The static-library, when installed in /usr/local/lib/, should also belong to
+        user/group root, but it doesn't need (and shouldn't have) the executable-flag.
+        Leading to the following fileaccess permissions: u=rw, g=r, o=r
+
+- Make the inodes(as superuser):
+
+        "cd /dev"
+        "mknod --mode=a+rw can0 c x 0"
+        "mknod --mode=a+rw can1 c x 1"
+          with x=major of driver.(See previous chapter)
+
+        NOTE:
+        On modern systems inodes in "/dev" vanish after reboot. You can work around by
+        creating the inodes in "/lib/udev/devices". So, instead of "cd /dev" go
+        "cd /lib/udev/devices" before calling mknod.
+
+- Load the Driverfile (as superuser):
+
+        Syntax: "insmod ./esdcan-crd-os-arch-ver [major=MA] [verbose=V] [mode=MO]"
+
+        with:
+          MA = major number (e.g. major=77, default see table above)
+          V = verbose mask (e.g. verbose=0x00000003, default 0x00000000)
+          MO = mode flags (e.g. mode=0x20000000, default 0x00000000)
+
+        Have a look at "Compile the driver" for the filename-description.
+
+- Look in /var/log/messages for any messages of the driver!
+
+
+**************************************
+3.b) Alternate installation using DKMS
+**************************************
+
+With some Linux distributions (tested with Debian/Ubuntu) you may be able to build and
+install the driver using the DKMS framework. This will have the benefit that on a kernel
+update the driver will automatically compiled and installed for the new kernel.
+
+Start with unpacking the driver release archive as described in the "3) Installation"
+section. Then change into the directory that was created by the unpacking action:
+
+        "cd ./esdcan-<crd>-<os>-<arch>-<ver>-<ext>"
+
+For the next steps you need to be *root*. In the mentioned directory enter the command
+
+        "dkms add ./src"
+
+which utilizes the "./src/dkms.conf" file to add a new package to the DKMS framework. The
+next step should build the driver which uses from "dkms.conf" the "PACKAGE_NAME" as <pkg-name>
+parameter and "PACKAGE_VERSION" as <pkg-ver> parameter.
+
+        "dkms build <pkg-name>/<pkg-ver>"
+        # example: dkms build esdcan-pcie402-linux-2.6.x-x86_64/3.9.6
+
+The next step is to install the driver in the "/lib/modules" tree by issuing this command:
+
+        "dkms install <pkg-name>/<pkg-ver>
+        # example: dkms install esdcan-pcie402-linux-2.6.x-x86_64/3.9.6
+
+This should also do any further installation work as "depmod". The installation directory
+for the kernel module depends on the configuration of the DKMS framework.
+
+The installation of the user space programs and libraries has still to be done as mentioned
+before.
+
+If you want to get rid of the installed driver for all kernel versions
+then issue the following command:
+
+        "dkms remove <pkg-name>/<pkg-ver> --all"
+        # example: dkms remove esdcan-pcie402-linux-2.6.x-x86_64/3.9.5 --all
+
+
+
+********************
+4) Driver parameters
+********************
+
+major
+-----
+May be used to set a non-default major number for the driver. If you don't know,
+what major numbers are or have no problems loading the driver and/or using the driver,
+then leave this parameter alone. Normally the default value should be ok.
+
+verbose
+-------
+By setting the verbose mask (value range 0x00000000 to 0x000000FF) you can influence
+the amount of messages the driver writes to your message log on startup. The value
+is interpreted bitwise, every additional bit may add more output.
+
+mode
+----
+This parameter is hardware dependent. Do not set any bits, not valid for your hardware,
+as this might lead to unexpected result. On most CAN boards there should be no need
+to set any bit at all.
+
+0x00000040  - Force LOM (off by default)
+0x00000080  - Smart disconnect (off by default)
+
+All boards with esdACC controller:
+0x20000000  - Select RX Timestamping mode (firmware version > 0.34)
+              (0: EOF (default), 1: SOF)
+0x02000000  - Select autobaud mode (firmware version > 0.47)
+              (0: Rounded bitlength (default), 1: Table based)
+
+CPCI-CAN/400-4I-PXI:
+0x10000000  - May be used to choose the timestamp source on driver startup
+              (0: IRIG-B (default), 1: PXI)
+0x08000000  - May be used to invert the Star-Trigger-Input
+
+
+***********************************
+5) Driver's thread priorities
+***********************************
+
+Basic information on the driver's kernel thread
+-----------------------------------------------
+
+The driver starts a kernel thread (dpc-thread) that distributes the received
+CAN frames to the user handles. If a process is waiting (in a canRead() for
+example) it is also released from its wait state.
+
+The driver's kernel thread gets its name derived from the name of the kernel
+module that contains the driver for your board. Examples:
+
+esdcan-amc4.ko          kesdcan_amc4
+esdcan-esdaccbm.ko      kesdcan_esdaccbm
+esdcan-pci405.ko        kesdcan_pci405
+esdcan-<card-id>        kesdcan_<card-id>
+
+If you install three cards of the same type you will still have a single kernel
+thread. But if you install different types of boards you will get a different
+named kernel thread for each type of board.
+
+The different names make it easier to distinguish which thread is responsible
+for which group of cards (of the same type).
+
+Old drivers used always the name "dpc thread" for their kernel threads (with
+a literal blank in the name).
+
+
+Advice for priority selection for the driver's kernel thread
+------------------------------------------------------------
+
+The default configuration of our CAN driver's kernel thread (dpc-thread) is to
+give it no special priority. So it runs with the default priority as all other
+user processes in the time shared class (nice NI=0, priority PRI=19 under x86
+Linux).
+
+This is suitable for a desktop system that only monitors some CAN buses. If you
+want to do some control business you may need better priorities.
+
+As a rule of thumb the dpc-thread should have a better priority than any of the
+user processes that do CAN I/O. Especially this is true if your user processes
+run in the FIFO scheduler class.
+
+Every control application is different. Therefore you have to fine tune the
+priority of the "dpc thread" so that it fits to your needs. You can do that
+with the Linux command line tools "ps", "renice" and "chrt".
+
+To get a sorted by priority list of threads you can enter the following command
+at the root prompt:
+
+# ps -eo pid,tid,class,rtprio,ni,pri,psr,pcpu,stat,wchan:24,comm Oy
+
+
+Identify the dpc-thread and your user program in the list. To only increase the
+priority in the TimeSharing class you may use commands like these:
+
+# ps -e | grep "kesdcan_pci405"
+  897 ?        00:00:00 kesdcan_pci405
+# renice -n -15 -p 897
+897 (process ID) old priority 0, new priority -15
+
+
+If you need to reach the FIFO scheduling class you can use the chrt tool. An
+example to change the thread's priority to FIFO priority 12 see below:
+
+# chrt -v -p -f 12 897
+pid 897's current scheduling policy: SCHED_OTHER
+pid 897's current scheduling priority: 0
+pid 897's new scheduling policy: SCHED_FIFO
+pid 897's new scheduling priority: 12
+
+
+Be aware of the fact that the given priorities are valid only in the selected
+"scheduler class" and the kernel's priority is also dependend from the "base
+priority" for a scheduler class.
+
+
+The "ps" command cited before gives you a by priority sorted list of threads
+and a good overview of the priority layout currently in use. This should enable
+you to adjust the priorities as needed. The necessary priority adjustment
+command can be embedded in one of the system's start scripts.
+
+
+
+**********
+6) CAN-API
+**********
+
+- After successful installation you can access the CAN-Bus with the ntcan-API
+  (link "libntcan.so" with your  application).
+
+
+*****************************************
+7) Sample-Programm "cantest"
+*****************************************
+
+Pay attention: The enclosed binary version of cantest needs to be able to find
+the dynamic-shared-library libntcan.so. Please, assure, that your LD_LIBRARY_PATH
+is set correctly.
+
+Syntax: "cantest test-number [net id-first id-last count
+                              txbuf rxbuf txtout rxtout baud
+                              testcount data0 data1 ... data8]"
+
+If called without parameters all available can-devices and version-numbers
+will be shown and a short help-screen is printed!
+
+parameter       description                             default
+---------------------------------------------------------------
+net             logical net-number(canOpen())           0
+id-first        enabled can-id's start-id               0
+id-last         enabled can-id's stop-id                0
+count           count of CMSG-packets                   1
+txbuf           tx-queue-size of handle(canOpen)        10
+rxbuf           rx-queue-size of handle(canOpen)        100
+txtout          tx-timeout of handle                    1000
+rxtout          rx-timeout of handle                    5000
+baud            baudrate-index                          2      (500 kbit/s)
+testcount       count of ntcan-API-Calls                10     (-1 => forever)
+databyte0       Up to 8 databytes for Test 0 or 1       8-Byte-Frames with
+.                                                       32-Bit Counters
+.
+.
+databyte7
+
+test    description
+---------------------------------------------------------------
+   0    sending can-frames without wait (canSend)
+
+   1    sending can-frames with wait (canWrite)
+
+   2    reading can-frames without wait (canTake)
+
+   3    reading can-frames with wait (canRead)
+
+   4    reading events (canReadEvent)
+
+   5    sending events (canSendEvent)
+
+
+
+*************************************************************
+8) Binary incompatiblities on libntcan level    !!!!!!!!!!
+*************************************************************
+
+Starting with this release we deliver the libntcan.so.4, i. e. a NTCAN library
+with a version of 4.
+
+This change was enforced because we had to change some NTCAN_IOCTL_* values
+which make the versions before and after that change binary incompatible! Find
+the details in the last paragraph of this section ("Incompatibility details").
+The change had to be done in preparation of the upcoming CAN-FD support.
+
+Because the binary incompatiblity can not be detected at runtime we were
+forced to change the library version of libntcan. From this release on the
+shared library will also use symbol versioning!
+
+To assist you with the administration of the <ntcan.h> headers new headers will
+contain a comment line like below to show that they belong to a libntcan.so.4
+release.
+
+/* Released with libntcan.so.4.0.0 */
+
+What does that mean for you on your host (development) system and on your
+target system?
+
+-----
+In the easy and recommended case, you migrate completely to the new driver and
+libntcan.so.4. Then do the following:
+
+- On your host system remove all instances of the old <ntcan.h> file.
+- On your host system remove all instances of the libntcan.so.3* files.
+- On your host system install the new <ntcan.h> and the libntcan.so.4*
+  files at the appropriate places.
+- If needed install the current releases of esd libraries that depend
+  on libntcan.so and are also needed by your application (see "Optional
+  Libaries" below).
+- Rebuild your application.
+- Install the new driver kernel module on the target system (and optionally
+  on the development system).
+- Install libntcan.so.4* (+optional libaries) and your rebuilt application
+  on the target system.
+- You're done.
+
+
+-----
+You need the new driver but don't need any extensions of later libntcan
+versions and you're not willing or capable to rebuild your application.
+
+- On your host system keep the old <ntcan.h> and the old libntcan.so.3*
+  files.
+- Do NOT install any of the new <ntcan.h> and libntcan.so.4* files!
+- Install the new driver kernel module on the target system (and optionally
+  on the development system).
+- You're done.
+
+
+-----
+The complicated case. You need to support target systems with old
+libntcan.so.3 and want to use the current release libntcan.so.4 on new
+designs. Be warned that this is error prone and can lead to silent failures
+of your application. Then do the following:
+
+- On your host system rename all instances of the old <ntcan.h> file to
+  the new name <ntcan3.h>.
+- Remove all symbolic links libntcan.so that point to a libntcan.so.3*
+  library.
+- On your host system install the new <ntcan.h> and the libntcan.so.4*
+  files at the appropriate places.
+- Run ldconfig. If not already there create a symbolic link libntcan.so
+  that points to the symbolic link libntcan.so.4 to make libntcan.so.4
+  the library version to be linked with by default.
+- Install the new driver kernel module and the old libntcan.so.3 or new
+  libntcan.so.4 on the target systems as needed.
+
+To use the new version 4 library simply rebuild your application and
+install it on the target which has the new libntcan.so.4 installed.
+
+
+To use the old version 3 library you have to do some additional tasks.
+
+- Add a code snippet like below to your source code to include the
+  old <ntcan3.h> for sure:
+
+#include "ntcan3.h"
+
+- Link explicitely with the old library version by adding the following
+  link option when linking your application: "-l:libntcan.so.3"
+  This tells the linker to explitely link with version 3 of libntcan.
+  Please observe the colon ":" that marks the beginning of an explicit name.
+- Then you can install your application on the target system with the
+  libntcan.so.3.
+
+NOTE: You MUST NOT build an application with <ntcan3.h> and link with
+libntcan.so.4 or vice versa. This may lead to silent malfunctions!!
+
+
+---- Optional Libaries
+
+There are some esd libraries that depend directly on the libntcan.so and
+are linked against either version 3 or 4. Therefore a matching version of the
+optional libraries needs to be installed on your host (development) system
+and your target system.
+
+The directly depending libraries are:
+
+libirigb.so     Access IRIG-B time data with CAN boards that support it.
+libcalcan.so    CAN base libarary for the esd CANopen master / slave.
+
+If you're using the libntcan.so also directly in your application make
+sure that you use a library version of the optional libraries that is
+linked against the same libntcan.so version that you're using for your
+application!
+
+You may diplay the link dependencies of the libary by using "ldd" or "objdump
+-x".
+
+
+---- Incompatibility details
+
+The following NTCAN_IOCTL_* defines changed their values from libntcan.so.3 to
+libntcan.so.4:
+
+#define NTCAN_IOCTL_SET_TX_TS_WIN         0x001B
+#define NTCAN_IOCTL_GET_TX_TS_WIN         0x001C
+#define NTCAN_IOCTL_SET_TX_TS_TIMEOUT     0x001D
+#define NTCAN_IOCTL_GET_TX_TS_TIMEOUT     0x001E
+#define NTCAN_IOCTL_SET_HND_FILTER        0x001F
+
+If you use these old defines on a new libntcan.so.4 implementation you will get
+malfunctions because these values mean different things in the libntcan.so.4
+implementation. The big deal is that using such a old define could change
+something completely different on the new implemenation even without provoking
+the return of an error code. This way the malfunction is SILENTLY triggered
+and the application has no means to detect it!
+
+
+
+****************
+9) Known Issues
+****************
+
+- When loading the module, kernels with version > 2.4.9 generate a warning about
+  a tainted kernel:
+  "Warning: loading ./esdcan-xyz will taint the kernel: no license"
+  This isn't an error message and doesn't concern the functionality of CAN-driver
+  or kernel.
+- Install-script is still missing

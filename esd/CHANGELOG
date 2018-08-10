@@ -1,0 +1,1560 @@
+ CHANGELOG for esd CAN driver
+ ==================================================================================
+
+
+    Copyright (c) 1996 - 2016 by esd electronic system design gmbh
+
+    This software is copyrighted by and is the sole property of
+    esd gmbh.  All rights, title, ownership, or other interests
+    in the software remain the property of esd gmbh. This
+    software may only be used in accordance with the corresponding
+    license agreement.  Any unauthorized use, duplication, transmission,
+    distribution, or disclosure of this software is expressly forbidden.
+
+    This Copyright notice may not be removed or modified without prior
+    written consent of esd gmbh.
+
+    esd gmbh, reserves the right to modify this software without notice.
+
+    electronic system design gmbh          Tel. +49-511-37298-0
+    Vahrenwalder Str 207                   Fax. +49-511-37298-68
+    30165 Hannover                         http://www.esd.eu
+    Germany                                sales@esd.eu
+
+
+ ==================================================================================
+
+ Nomenclature:
+       I20-cards:  CAN-PCI/331, CPCI-CAN/331, CAN-ISA/331, CAN-PC104/331, CAN-PCI/360,
+                   CPCI-CAN/331, PMC-CAN/331, CAN-USB/331 (aka CAN-USB/Mini)
+       SJA1000:    CAN-PCI/200, CPCI-CAN/200, CAN-ISA/200, CAN-PC104/200, CAN-PCI/266,
+                   PMC-CAN/266, CAN-PCIe/200, CAN-PCI104/200
+                   (C200 is used synonymically)
+       REMOTE-I/F: CAN-PCI/405
+                   (C405 is used synonymically)  
+       82527:      CAN-PC104/200-I
+       MSCAN:      - none, yet (embedded devices, only)
+       PCI400:     CAN-PCI/400, CPCI-CAN/400, PMC-CAN/400, CAN-PCIe/400
+                   (C400 is used synonymically)
+       PCIe402:    CAN-PCIe/402, CAN-PCI/402, CPCIserial-CAN/402
+                   (C402 is used synonymically)
+       AMC4:       AMC-CAN/4
+	   USB400:     CAN-USB/400
+                   (U400 is used synonymically)
+
+ ==================================================================================
+
+ Note: The most recent version of the esd CAN driver may vary with your
+       hardware.
+
+ ==================================================================================
+
+ VERSION |   DATE   | CHANGES                                            | INITIALS
+ ==================================================================================
+ 3.10.4   11.05.2016  Release of 3.10.4 for PCIe402 for Linux (x86, x86_64)   STM
+          10.05.2016  Release of 3.10.4 for PCI400 for Linux (x86, x86_64)    STM
+                      Integrated FPGA image 00.63 (00.3F HEX). See below.
+
+ 3.10.3   28.04.2016  Release of 3.10.3 for C400 for Windows                  OT
+ 
+                      Updated FPGA image to 00.63 (00.3F HEX).                WB
+                      - Fixed issue on spartan 3e
+                      - Fixed busmaster DMA operation could not be disabled
+                      
+          26.04.2016  PCI400/PCIe402:                                         MK
+                      Fix reported bitrate for ESDACC baudrates without 
+                      CANIO_NO_IMPLICIT_CLK_DIV.
+
+ 3.10.2   02.02.2016  Release of 3.10.2 for C402 for Windows                  OT
+ 
+ 3.10.2   29.01.2016  Release of 3.10.2 for C400 for Windows                  OT
+
+ 4.0.2    26.01.2016  Release of 4.0.2 for USB400 for Windows                 OT
+ 
+                      Updated FPGA image to 00.62 (00.3E HEX)                 WB
+                      - Added BM Statistics feature and disable register
+                        for irq counter updates which reduces protocol
+                        overhead and improves performance.
+
+ 3.10.0   20.01.2016  Release of 3.10.0 for C402 for RTX and RTX64 2014       OT
+                      Release of 3.10.0 for C200 for RTX and RTX64 2014       OT
+
+ 3.10.0   19.01.2016  Release of 3.10.0 for C400 for RTX and RTX64 2014       OT
+
+ 3.10.0   10.12.2015  Release of 3.10.0 for PCIe402 for Windows               OT
+
+ 3.10.3   02.12.2015  Release of 3.10.3 for amc825 for Linux (x86, x86_64)    STM
+          02.12.2015  Release of 3.10.3 for PCI400 for Linux (x86, x86_64)    STM
+          02.12.2015  Release of 3.10.3 for PCIe402 for Linux (x86, x86_64)   STM
+                      Updated FPGA image to 00.61 (00.3D HEX). Got small
+                      changes to fix defects for timing corner cases found
+                      during the certification process. This version is now
+                      certified to conform to "ISO 16845:2004".
+
+          02.12.2015  Linux, QNX, VxWorks on PCI400/PCIe402:                  STM
+                      Added support for NTCAN_RESET_CTRL_EC in library
+                      and driver.
+
+  3.10.2  18.11.2015  Release of 3.10.2 for AIM AMC825 for                    WB
+                       Linux (x86, x86_64)
+          18.11.2015  Linux:                                                  WB
+                      Fixed hangup in canSend when sending synchronous        
+                       event. 
+  3.10.1  18.09.2015  Release of 3.10.1 for pci405 (c405) for VxWorks 6.x     STM
+                       as VxBus (Rev. 4) UP and SMP driver (ARCH=pentium)
+
+          16.09.2015  VxWorks:                                                STM
+                      Added support for NTCAN_IOCTL_GET_INFO in library
+                      and driver.
+
+  3.10.0  04.09.2015  Release of 3.10.0 for PCI405 for QNX6                   TA
+
+  3.10.0  02.09.2015  Release of 3.10.0 for c405 for RTX 2009/2011/2012       OT
+
+  3.10.1  28.08.2015  Full range of Linux driver / library releases to        STM
+                      switch library to version 4.x (libntcan.so.4). This
+                      version of the library is binary incompatible with the
+                      old version 3.x releases and requires recompilation of
+                      all applications. The new version also introduces
+                      symbol versioning.
+
+          28.08.2015  Release of 3.10.1 for AMC4 for Linux (x86, x86_64)      STM
+          28.08.2015  Release of 3.10.1 for amc825 for Linux (x86, x86_64)    STM
+          28.08.2015  Release of 3.10.1 for ISA200 for Linux (x86, x86_64)    STM
+                      The x86_64 variant can't be testet due to lack of a
+                      64-bit capable ISA system.
+          28.08.2015  Release of 3.10.1 for ISA331 for Linux (x86, x86_64)    STM
+                      The x86_64 variant can't be testet due to lack of a
+                      64-bit capable ISA/PC104 system.
+          28.08.2015  Release of 3.10.1 for PCI200 for Linux (x86, x86_64)    STM
+          28.08.2015  Release of 3.10.1 for PCI331 for Linux (x86, x86_64)    STM
+          28.08.2015  Release of 3.10.1 for PCI360 for Linux (x86, x86_64)    STM
+          28.08.2015  Release of 3.10.1 for PCI400 for Linux (x86, x86_64)    STM
+          28.08.2015  Release of 3.10.1 for PCI405 for Linux (x86, x86_64)    STM
+          28.08.2015  Release of 3.10.1 for PCIe402 for Linux (x86, x86_64)   STM
+                      Updated FPGA image to 00.58 (00.3A HEX). Got small
+                      changes to fix defects for timing corner cases found
+                      during the certification process.
+
+  3.10.0  24.08.2015  Release of 3.10.0 for c405 for Windows                  OT
+					  
+          18.08.2015  Nucleus/PCI405                                          TA
+                      Fixed crash on enabled SmartDisconnect with PCI405.
+
+
+  3.10.2  29.06.2015  Release for PCI400 for LynxOS(x86/DRM)                  TA
+                      
+          23.06.2015  LynxOS: Changes needed for static driver option
+          22.06.2015  LynxOS Bugfix: canSend returns error but sent frames
+
+  3.10.1  12.06.2015  First Release for PCI400 for LynxOS(x86/DRM)            TA
+                      
+          11.06.2015  LynxOS Bugfixes:                                        TA
+                      Driver does only work on 100 hz System(ADDON detection)  
+                      >= 2 threads on 1 handle can crash the kernel in close 
+                      canRead can crash the kernel 
+
+          09.06.2015  Nucleus:                                                TA 
+                      canIdRegionAdd/Delete with inv. para does not clr count
+ 
+          08.06.2015  LynxOS Bugfixes:                                        TA
+                      TX obj mode can crash the kernel
+                      Timestamed tx window default not working  
+                      NTCAN_IOCTL_GET_INFO is missing
+                      Internal driver sleeps do not wait long enough
+                      Legacy filter canIdAdd/Delete with inv. para ret OK
+
+  3.10.0  04.06.2015  First Beta Release for PCI400 for LynxOS(x86/DRM)       TA
+  
+  3.10.0  04.06.2015  Release for amc825 for VxWorks 6.x                      STM
+                       as "esdcan"(legacy) and DKM (UP+SMP) (ARCH=ppc/CPU=PPC32)
+  3.10.0  04.06.2015  Release for amc825 for VxWorks 5.5                      STM
+                       as DKM (UP driver only) (ARCH=ppc)
+
+  3.10.0  04.06.2013  Release for pci400 (c400) for VxWorks 6.x               STM
+                       as VxBus (Rev. 4) UP and SMP driver (ARCH=pentium)
+  3.10.0  04.06.2015  Release for pci400 (c400) for VxWorks 5.4               STM
+                       as DKM (UP driver only) (ARCH=ppc) (built only)
+          
+          03.06.2015  From now on we have support for good old LynxOS         TA 
+
+  3.10.0  03.06.2015  Release for pci400 (c400) for VxWorks 6.x               STM
+                       as "esdcan"(legacy) and DKM (UP+SMP) (ARCH=ppc/CPU=PPC32)
+  3.10.0  03.06.2015  Release for pci400 (c400) for VxWorks 5.5               STM
+                       as DKM (UP driver only) (ARCH=ppc)
+
+  4.0.0   02.06.2015  Release of 4.0.0 for USB400 for Windows                 OT
+
+  3.10.0  27.03.2015  Release of 3.10.0 for PCI200 for QNX6                   TA
+                      Release of 3.10.0 for PCI400 for QNX6                   TA 
+                      Release of 3.10.0 for PCIe402 for QNX6                  TA
+  
+  3.9.80  30.01.2015  Release of 3.9.80 for PCI400 for RTX64 2014             OT
+
+  4.0.0   26.01.2015  Release of 4.0.0 for PCIe402 for Windows                OT
+
+  4.0.0   26.01.2015  Release of 4.0.0 for PCI400 for Windows                 OT
+
+  3.10.0  20.01.2015  Release of 3.10.0 for PCI400 for Windows                OT
+
+  3.10.0  13.01.2015  Release of 3.10.0 for PCIe402 for Linux (x86, x86_64)   STM
+
+  3.10.0  13.01.2015  Release of 3.10.0 for PCI400 for Linux (x86, x86_64)    STM
+
+          13.01.2015  PCI400, PCIe402: Updated to FPGA release 00.54          STM
+                      This fixes the deadlock for reenabling bus-error IRQs
+                      (see Mantis #2481 below) on FPGA level.
+                      This fixes the possible transmission of an old CAN ID
+                      from the standard TX FIFO when a frame is waiting for
+                      transmission in the TS (Time Stamped) TX FIFO on FPGA
+                      level.
+
+          13.01.2015  Added IOCTL_ESDCAN_GET_INFO on driver level.            STM
+                      Only accessible with NTCAN library 3.5.3 and up.
+
+
+  3.9.84  19.12.2014  Release of 3.9.84 for PCI400 for Windows                OT
+
+  3.9.6   24.11.2014  Release of 3.9.6 for PCIe402 for RTX64 2014             OT
+
+  3.9.6   31.10.2014  Release of 3.9.6 for PCIe402 for Linux (x86, x86_64)    STM
+
+  3.9.5   31.10.2014  Release of 3.9.5 for AMC4 for Linux (x86, x86_64)       STM
+
+  3.9.83  31.10.2014  Release of 3.9.83 for PCI400 for Linux (x86, x86_64)    STM
+
+          31.10.2014  AMC4, PCI400, PCIe402: Work around deadlock that occurs STM
+                      when enabling again bus-error IRQs after IRQ throttle
+                      caused in error-passive state (see Mantis #2481).
+                      This work around is not enabled in the trunk.
+
+          31.10.2014  Linux: Fix hang in canClose() after                     STM
+                      NTCAN_CONTROLLER_BUSY (see Mantis #2461)
+
+          31.10.2014  AMC4, PCI400, PCIe402: Fix driver blocked on node lock  STM
+                      polling for controller recovery after bus-off condition
+                      (see Mantis #2461)
+
+
+  3.9.5   24.09.2014  Release of 3.9.5 for PCIe402 for RTX64 2013             OT
+
+  3.9.3   07.08.2014  Release of 3.9.3 for Sitara/DCAN for Linux              MF
+
+  3.9.82  22.07.2014  Release of 3.9.82 for PCI400 for Linux                  STM
+
+  3.9.4   10.07.2014  Release of version 3.9.4 for isa331 for Linux           STM
+
+  3.9.4   30.06.2014  Release of 3.9.4 for AMC4 for Linux (x86, x86_64)       STM
+
+  3.9.02  14.05.2014  Release of version 3.9.02 for pci360 for QNX6           TA
+
+          12.05.2014  Fix unwanted use of different tx queues in cpci-360     MK
+
+  3.9.6   07.04.2014  Release of 3.9.6 for PCIe402 for Windows                OT
+		  
+  3.9.01  01.04.2014  Release of version 3.9.01 for pci360 for QNX6           TA
+
+          26.03.2014  PCI331: Avoid PCI write buffer issue with IRQ reset     STM
+                      (see Mantis #2329)
+
+          05.02.2014  PCIxxx, QNX:                                            TA
+                      Added IRQ Overload Option for buggy pci-XXX Servers
+                      in some QNX BSP's.
+
+  3.9.4   04.02.2014  Release of 3.9.4 for PCI331 for Linux                   BL
+
+  3.9.3   03.02.2014  Release of 3.9.3 for PCI200 for Linux                   BL
+
+  3.9.81  03.02.2014  Release of 3.9.81 for PCI400 for Linux                  BL
+
+  3.9.5   03.02.2014  Release of 3.9.5 for PCIe402 for Linux                  BL
+
+                      PCI400, Linux:
+                      Added IRIG-B library (for PMC-CAN/400-4I) to
+                      release archive
+
+                      PCIe402, Linux:
+                      Firmware updater added to archive
+
+  3.9.81  20.12.2013  Release of 3.9.81 of amc825 for VxWorks 6.x             STM
+                       as "esdcan"(legacy) and DKM (UP+SMP= driver (ARCH=ppc)
+  3.9.4   20.12.2013  Release of 3.9.4  for pci200 (c200) for VxWorks 6.x     STM
+                       as "esdcan"(legacy) and DKM (UP+SMP= driver (ARCH=ppc)
+  3.9.3   20.12.2013  Release of 3.9.3  for pci331 (c331) for VxWorks 6.x     STM
+                       as "esdcan"(legacy) and DKM (UP+SMP= driver (ARCH=ppc)
+  3.9.81  20.12.2013  Release of 3.9.81 for pci400 (c400) for VxWorks 6.x     STM
+                       as "esdcan"(legacy) and DKM (UP+SMP= driver (ARCH=ppc)
+
+  3.9.3   05.12.2013  Release of 3.9.3  for pci200 (c200) for VxWorks 6.x     STM
+                       as VxBus (Rev. 4) UP and SMP driver (ARCH=pentium)
+  3.9.2   05.12.2013  Release of 3.9.2  for pci331 (c331) for VxWorks 6.x     STM
+                       as VxBus (Rev. 4) UP and SMP driver (ARCH=pentium)
+  3.9.80  05.12.2013  Release of 3.9.80 for pci400 (c400) for VxWorks 6.x     STM
+                       as VxBus (Rev. 4) UP and SMP driver (ARCH=pentium)
+  3.9.5   05.12.2013  Release of 3.9.5  for pcie402 (c402) for VxWorks 6.x    STM
+                       as VxBus (Rev. 4) UP and SMP driver (ARCH=pentium)
+  3.9.2   05.12.2013  Release of 3.9.2  for pci405 (c405) for VxWorks 6.x     STM
+                       as VxBus (Rev. 4) UP and SMP driver (ARCH=pentium)
+
+  3.9.6   19.11.2013  Release of 3.9.6 for pcie402 for QNX6                   TA
+
+  3.9.80  19.11.2013  Release of 3.9.80 for pci400 for QNX6                   TA
+
+  3.9.2   31.10.2013  Release of 3.9.2  for pci200 for VxWorks >= 6.7         STM
+                       as VxBus (Rev. 4) UP and SMP driver (ARCH=pentium)
+
+                      PCIe402:                                                BL
+                      Fixed: Slightly wrong hardware timer speed
+                      Fixed: MSI not working depending on given address
+
+                      PCI400/PCIe402:                                         BL
+                      Fixed: In rare conditions TX Acknowledgte got
+                             lost after Bus Off (leading to application
+                             not exiting correctly)
+                      Fixed: After bus off it was possible to receive a
+                             frame, which  transmitted by the same node
+                             before bus off
+
+  3.9.5   21.10.2013  Release of 3.9.5 for pci405 for Linux                   BL
+
+  3.9.5   09.10.2013  Release of 3.9.5 for PCIe402 for RTX                    OT
+
+  3.9.79  30.09.2013  Release of 3.9.79 for c400 for VxWorks (ppc) 5.5, 6.9   STM
+
+  3.9.4   19.09.2013  Release of 3.9.4 for pcie402 for QNX6                   TA
+
+  3.9.79  13.09.2013  Release of 3.9.79 for amc825 for VxWorks 5.5, 6.6 (ppc) BL
+
+  3.9.79  13.09.2013  Release of 3.9.79 for amc825 for Windows                BL
+
+  3.9.3   13.09.2013  Release of 3.9.3 for c200 for RTX 2009/2011/2012        OT
+
+  3.9.79  13.09.2013  Release of 3.9.79 for c400 for RTX 2009/2011/2012       OT
+
+  3.9.79  12.09.2013  Release of 3.9.79 for amc825 for Linux                  BL
+
+                      PCIe402:                                                BL
+                      Added new autobaud method,
+                        faster and more reliable results
+
+                      PCI400:                                                 BL
+                      Autobaud slightly improved
+                        (new mode is still PCIe402, only, but will follow
+                         on CAN-PCI/400 soon)
+
+                      PCI400+PCIe402:                                         BL
+                      Fixed a bug with bit errors leading to active error
+                        frames occurring while controller is in
+                        listen-only-mode
+                      Fixed a problem with resynchronisation on CAN busses
+                        with bad signal conditions and slow baudrates
+
+                      Linux:                                                  BL+MK
+                      Tested up to kernel 3.10
+                      Bugfix: canTake() returning NTCAN_PENDING_READ
+                              under certain conditions
+                      Changed: Startup banner cleanup and less text by default,
+                               more may be selected via verbose option
+
+  3.9.3   11.09.2013  Release of 3.9.3 for c405 for RTX 2009/2011/2012        OT
+                      Release of 3.9.3 for c331 for RTX 2009/2011/2012
+
+  3.9.4   30.08.2013  Release of 3.9.4 for PCIe402 for RTX64 2013             OT
+
+  3.9.4   30.08.2013  Release of 3.9.4 for PCIe402 for RTX                    OT
+
+  3.9.77  16.08.2013  Release of 3.9.77 for amc825 for VxWorks 5.5, 6.6 (PPC) BL
+
+  3.9.77  14.08.2013  Release of 3.9.77 for PCI400 (CAN/400) for Windows      OT
+
+  3.9.4   14.08.2013  Release of 3.9.4 for pcie402 for Linux                  BL
+
+  3.9.5   13.08.2013  Release of 3.9.5 for pci405 for Windows                 OT
+
+  3.9.3   12.08.2013  Release of 3.9.3 for PCIe402 for Windows                OT
+
+  3.9.3   02.08.2013  Release of 3.9.3 for pcie402 for Linux                  BL
+
+                      PCI400:                                                 BL
+                      Driver option to select the point of timestamping on
+                        RX traffic (EOF (default, same as before) and SOF)
+                      Hardware support for "Timestamped TX"
+                        (see NTCAN-API man
+ual)
+                      Bugfix: Race condition on SMP systems fixed
+                              (caused lagging TX)
+
+                      Linux:                                                  BL
+                      Bugfix: Wrongly returned len-parameter on canWrite()
+                              in succesion of canSend()
+
+  3.9.2   18.07.2013  Release of 3.9.2 for PCIe402 for RTX 2012               OT
+
+  3.9.2   12.07.2013  Release of 3.9.2 for PCIe402 for RTX64 2013             OT
+
+  3.9.2   08.07.2013  Release of 3.9.2 for pci405 for RTX 8.x / 2009 /2011    OT
+
+  3.9.74  08.07.2013  Release of 3.9.74 for PCI400 (CAN/400)
+                       for RTX 8.x / 2009 /2011                               OT
+
+  3.9.2   28.06.2013  Release of 3.9.2 for PCIe402 for Windows                OT
+
+  3.9.74  13.06.2013  Release of 3.9.74 for PCI400 (CAN/400) for Linux        BL
+
+  3.9.74  31.05.2013  Release of 3.9.2 for c200 for RTX64 2013                OT
+
+  3.9.2   31.05.2013  Release of 3.9.74 for c400 for RTX64 2013               OT
+
+  3.9.74  21.03.2013  Release of 3.9.71 for pci400 for VxWorks >= 6.7         OT
+                       as VxBus (Rev. 4) UP and SMP driver
+  3.9.1   21.03.2013  Release of 3.9.1  for pci200 for VxWorks >= 6.7         OT
+                       as VxBus (Rev. 4) UP and SMP driver
+  3.9.1   21.03.2013  Release of 3.9.1  for pci331 for VxWorks >= 6.7         OT
+                       as VxBus (Rev. 4) UP and SMP driver
+  3.9.1   21.03.2013  Release of 3.9.1  for pci405 for VxWorks >= 6.7         OT
+                       as VxBus (Rev. 4) UP and SMP driver
+
+  3.9.1   04.03.2013  Release of 3.9.1 for PCI400 based CAN on PMC-CPU/440    OT
+                       as part of the VxWorks 6.8/6.9 BSP (no VxBus)
+
+  3.9.72  04.02.2013  Release of 3.9.72 for PCI400 (CAN/400) for Windows      OT
+
+  3.9.4   28.01.2013  Release of 3.9.4 for pci405 for Windows                 OT
+
+  3.9.71  11.01.2013  Release of 3.9.71 for PCI400 (CAN/400) for Windows      OT
+
+                      Support for feature "Timestamped Tx" aka canSendT
+
+  3.9.71  12.12.2012  Release of 3.9.71 for PCI400 (CAN/400) for Linux        BL
+
+                      PCI400:
+                      Automatic AddOn detection for CAN-PCI(e)/400 on
+                      driver startup
+
+  3.9.4   03.12.2012  Release of 3.9.4 for pci405 for QNX6                    TA
+
+  3.9.3   03.12.2012  Release of 3.9.3 for pci200 for QNX6                    TA
+
+  3.9.2   03.12.2012  Release of 3.9.2 for isa200 for QNX6                    TA
+
+          29.11.2012  PCI405:                                                 TA
+                      Firmware Version 3.8.25
+
+                      SJA1000:                                                TA
+                      Bugfix: Under rare conditions can error handling can
+                      stall TX
+
+  3.9.70  20.11.2012  Release of 3.9.70 for pci400 for VxWorks >= 6.7         OT
+                       as VxBus (Rev. 4) UP and SMP driver
+  3.9.0   20.11.2012  Release of 3.9.0  for pci200 for VxWorks >= 6.7         OT
+                       as VxBus (Rev. 4) UP and SMP driver
+  3.9.0   20.11.2012  Release of 3.9.0  for pci331 for VxWorks >= 6.7         OT
+                       as VxBus (Rev. 4) UP and SMP driver
+  3.9.0   20.11.2012  Release of 3.9.0  for pci405 for VxWorks >= 6.7         OT
+                       as VxBus (Rev. 4) UP and SMP driver
+
+  3.9.4   25.10.2012  Release of 3.9.4 for pci405 for Linux                   BL
+
+          25.10.2012  Linux:                                                  BL
+                      Tested with kernels up to 3.6
+
+  3.9.71  22.10.2012  Release of 3.9.71 for amc825 for VxWorks 6.6 (x86)      OT
+                       with VxBus (Rev. 3)
+
+  3.9.0   18.10.2012  Release of 3.9.0 for PCI400 based CAN on PMC-CPU/440    OT
+                       as part of the VxWorks 6.8/6.9 BSP (no VxBus)
+
+  3.9.70  29.08.2012  Release of 3.9.70 for pci400 for QNX6                   TA
+
+  3.9.3   29.08.2012  Release of 3.9.3 for pci405 for QNX6                    TA
+
+  3.9.2   29.08.2012  Release of 3.9.2 for pci331 for QNX6                    TA
+
+  3.9.2   29.08.2012  Release of 3.9.2 for pci200 for QNX6                    TA
+
+  3.9.1   29.08.2012  Release of 3.9.1 for isa200 for QNX6                    TA
+
+  3.9.1   29.08.2012  Release of 3.9.1 for isa331 for QNX6                    TA
+
+          28.08.2012  BUGFIX: SET_BUSLOAD_INTERVAL causes crash of
+                      pci405-firmware.                                        TA
+
+          19.04.2012  QNX6:
+                      Bugfix: Workerthread for initphase
+                      may only receive pulses!!                               TA
+
+  3.9.70  27.03.2012  Release of 3.9.70 for PCI400 for VxWorks 5.4            OT
+
+  3.9.03  13.03.2012  Release of version 3.9.03 for pci405 for Windows        OT
+
+  3.9.69  08.03.2012  Release of 3.9.69 for PCI400 for Linux                  BL
+
+  3.9.2   06.03.2012  Release of 3.9.2 for pci405 for QNX6                    TA
+
+          02.03.2012  SJA1000:                                                TA
+                      Bugfix: can error handling can stall the tx engine
+
+          01.03.2012  QNX6:                                                   TA
+                      Bugfix: Under rare conditions, timeout handling
+                      can occur at a wrong point in time.
+
+          28.02.2012  QNX6:                                                   TA
+                      Bugfix: canStatus does not initialize controller type
+
+          17.01.2012  All:                                                    TA
+                      Bugfix: Received CAN frame order can differ from
+                      physical order on the bus, if interaction comes into
+                      play.
+
+  3.9.68  27.12.2011  Release of 3.9.68 for amc825 for Linux, Win, VxWorks    BL
+
+  3.9.1   22.12.2011  Release of 3.9.1 for pci331 for QNX6                    TA
+
+  3.9.1   22.12.2011  Release of 3.9.1 for pci200 for QNX6                    TA
+
+  3.9.0   22.12.2011  Release of 3.9.0 for isa200 for QNX6                    TA
+
+  3.9.0   22.12.2011  Release of 3.9.0 for isa331 for QNX6                    TA
+
+  3.9.67  21.12.2011  Release of 3.9.67 for pci400 for QNX6                   TA
+
+  3.9.67  14.11.2011  Release of 3.9.67 for PCI400 for Linux                  BL
+
+  3.9.03  01.11.2011  Release of 3.9.03 for pci405 for Linux                  BL
+
+          01.11.2011  Linux:                                                  BL
+                      Tested with kernels up to 3.0.4
+
+          31.10.2011  Linux:                                                  BL
+                      Merged "preempt_rt" branch.
+                      Rewritten synchronization for canRead(), canWrite()
+                      and canClose(), which is used for all
+                      kernels > 2.6.20 from now on
+
+                      NOTE:
+                      From now on, the x86 32-Bit drivers for
+                      Linux kernels >= 2.6.0 are compiled for "i686"
+                      architecture.
+                      For x86_64 "k8" is chosen as target architecture.
+
+                      NOTE:
+                      These are the latest drivers available for
+                      2.4.x kernels. esd will release updates for 2.4.x
+                      drivers only on special customer request.
+
+  3.9.02  18.10.2011  Release of version 3.9.02 for pci200 for Linux          BL
+
+  3.9.01  23.09.2011  Release of version 3.9.01 for cpci405/cterm for QNX6    TA
+
+          22.08.2011  QNX6 BUGFIX:
+                       - PPC405 borads with >= 2 CAN-Nodes with dedicated
+                         IRQ's can get frozen
+
+  3.9.64  03.08.2011  Release of version 3.9.64 for pci400 for RTX 8.x/2009   OT
+
+  3.9.01  03.08.2011  Release of version 3.9.01 for pci405 for RTX 8.x/2009   OT
+                      Release of version 3.9.01 for pci331 for RTX 8.x/2009
+                      Release of version 3.9.01 for pci200 for RTX 8.x/2009
+
+          03.08.2011  RTX Bugfix:
+                        - Disabled Rx timeout with previous 3.9.x release.
+
+  3.9.63  07.07.2011  Release of version 3.9.63 for pci400 for Windows (x64)  OT
+
+  3.9.2   07.07.2011  Release of version 3.9.2 for pci405 for Windows (x64)   OT
+
+  3.9.63  06.07.2011  Release of version 3.9.63 for pci400 for RTX 8.x/2009   OT
+
+          06.07.2011  RTX:                                                    OT
+                      Missing IoCtls added:
+                        NTCAN_IOCTL_RESET_CAN_ERROR_CNT
+                      Missing API-Functions added:
+                        canIdRegionAdd
+                        canIdRegionDelete
+                      Bugfix:
+                        - Removed trigger of timeout for IOCTL_CAN_SEND
+                          and IOCTL_CAN_TAKE.
+
+  3.9.01  15.12.2010  Release of version 3.9.01 for pci200 for Linux          BL
+
+  3.9.04  13.12.2010  Release of version 3.9.00 for amc825 for vxWorks        TA
+
+          13.12.2010  Bugfix: TX_OBJ Mode broken for 20b id's since           TA
+                      merge of smart id filter
+
+  3.9.00  02.12.2010  Release of version 3.9.00 for isa331 for Linux          BL
+
+  3.9.01  26.11.2010  Release of version 3.9.01 for pci405 for QNX6           TA
+
+  3.9.00  26.11.2010  Release of version 3.9.00 for pci360 for QNX6           TA
+
+  3.9.00  08.11.2010  Release of version 3.9.00 for pci331 for Linux          BL
+
+  3.9.01  15.10.2010  Release of version 3.9.01 for pci405 for Windows        TA
+
+          15.10.2010  Bugfix: pci405 load/unload could freeze System(#1149)  MF+TA
+
+  3.9.00  22.09.2010  Release of version 3.9.00 for pci200 for Linux          BL
+
+          20.09.2010  Linux:                                                  BL
+                      Changes to work with kernels up to 2.6.35
+
+  3.9.00  08.07.2010  Release of version 3.9.00 for pci405 for QNX6           TA
+                      Release of version 3.9.00 for pci331 for QNX6
+                      Release of version 3.9.00 for pci200 for QNX6
+
+          17.06.2010  QNX: Bugfix: Coredump from _GET_BUSLOAD_INTERVAL,       TA
+                           _GET_ERROR_COUNTER,_GET_BITRATE_DETAILS
+
+          16.06.2010  Smart ID Filter merged in                               TA
+
+  3.8.21  23.06.2010  Linux:                                                  BL
+                      Release rebuilt on different system to check
+                      incompatibility with customer system
+
+  3.8.20  14.06.2010  Linux:                                                  BL
+                      Fixes for RT patched Linux kernel 2.6.31-9-rt
+                      (Xubuntu): Timeouts work correctly now.
+
+  3.8.19  09.06.2010  Linux:                                                  BL
+                      Special release for kernel 2.6.31-9-rt (Xubuntu)
+
+  3.8.19  14.05.2010  Release of version 3.8.19 for pci331 for Linux          BL
+
+          12.05.2010  Linux: Removed redundant include directory in           BL
+                             release Makefile
+
+  3.8.19  21.04.2010  Release of version 3.8.19 for pci405 for RTX 8.x        OT
+          21.04.2010  Release of version 3.8.19 for pci331 for RTX 8.x        OT
+          21.04.2010  Release of version 3.8.19 for pci200 for RTX 8.x        OT
+
+          21.04.2010  RTX:
+                      New Features:
+                      Support for canIoctl commands:
+                        NTCAN_IOCTL_SET_BUSLOAD_INTERVAL
+                        NTCAN_IOCTL_GET_BUSLOAD_INTERVAL
+                        NTCAN_IOCTL_GET_BUS_STATISTIC
+                        NTCAN_IOCTL_RESET_BUS_STATISTIC
+                        NTCAN_IOCTL_GET_CTRL_STATUS
+                        NTCAN_IOCTL_GET_BITRATE_DETAILS
+
+  3.8.19  29.04.2010  Release of version 3.8.19 for pci405 for Linux          BL
+
+          16.04.2010  QNX: Bugfix: Driver can crash with delayed close.       TA
+                           canClose does not block anymore.
+
+          22.03.2010  Bugfix: Busload event could crash under certain        BL+MK
+                              conditions
+
+          16.03.2010  Linux+VxWorks:                                          BL
+                      Added: Possibility to use NTCAN_HANDLEs in
+                             combination with select()
+
+  3.8.18  11.03.2010  Release of version 3.8.18 for pci200 for Linux          BL
+
+          10.03.2010  Bugfix: Possibility to block in canClose(),             TA
+                              if multiple handles are used on same net
+
+  3.8.17  23.02.2010  Release of version 3.8.17 for pci200 for Linux          BL
+
+          22.02.2010  Linux:
+                      Changes to work with kernels up to 2.6.32
+
+  3.8.17  01.02.2010  Release of version 3.8.17 for pci405 for QNX6           TA
+                      Release of version 3.8.17 for pci331 for QNX6
+                      Release of version 3.8.17 for pci200 for QNX6
+
+          25.01.2010  QNX performance update                                  TA
+                      Less kernel calls for rx and tx.
+
+
+  3.8.16  14.12.2009  Release of version 3.8.16 for pci405 for QNX6           TA
+
+          10.12.2009  Bugfix: pci405 firmware could crash with                TA
+                      NTCAN_IOCTL_GET_BUS_STATISTIC or
+                      NTCAN_IOCTL_GET_BITRATE_DETAILS
+
+          08.12.2009  QNX:                                                    TA
+                      Missing IoCtls added:
+                        NTCAN_IOCTL_ABORT_RX
+                        NTCAN_IOCTL_ABORT_TX
+                        NTCAN_IOCTL_SET_RX_TIMEOUT
+                        NTCAN_IOCTL_SET_TX_TIMEOUT
+                        NTCAN_IOCTL_SET_BUSLOAD_INTERVAL
+                        NTCAN_IOCTL_GET_BUSLOAD_INTERVAL
+                        NTCAN_IOCTL_GET_BUS_STATISTIC
+                        NTCAN_IOCTL_GET_CTRL_STATUS
+                        NTCAN_IOCTL_GET_BITRATE_DETAILS
+                      Missing API-Functions added:
+                        canIdaRangeAdd
+                        canIdRangeDelete
+
+  3.8.16  02.12.2009  Release of version 3.8.16 for pci405 for Linux          AB
+
+          01.12.2009  Fixed: CAN-20b Autoanswer mode                          TA
+
+                      Remote-I/F:
+                      Fixed: Interaction in combination with autoanswer
+
+  3.8.10  16.10.2009  Release of version 3.8.10 for pci405 for QNX6           TA
+  3.8.10  16.10.2009  Release of version 3.8.10 for pci331 for QNX6           TA
+
+          16.10.2009  QNX:                                                    TA
+                      New -t option for thread pool size
+
+                      Senseless pulses from irq level removed.
+
+          15.10.2009  QNX:                                                    TA
+                      Several fixes, to make the driver thread save
+
+          09.10.2009  QNX:                                                    TA
+                      Resource-Manager is multithreaded from now on
+
+          08.10.2009  QNX:                                                    TA
+                      Resource-Manager will daemonize from now on
+
+  3.8.14  20.08.2009  Release of version 3.8.14 for pci405 for Linux          AB
+
+          20.08.2009  Linux:                                                  AB
+                      Tested with kernels up to 2.6.30
+
+          19.08.2009  Fixed: Bug in AutoRTR feature                           AB
+                      If RTR was sent on the same net, where another
+                      handle has configured the AutoRTR object, multiple
+                      RTR replies were generated.
+
+          06.07.2009  Linux:                                                  AB
+                      Changes to keep track with and profit of general
+                      linux kernel changes.
+
+  3.8.12  23.06.2009  Release of version 3.8.12 for pci405 for Linux          AB
+
+          18.06.2009  Linux:
+                      Fixed bug introduced with 3.8.11
+
+  3.8.8   17.06.2009  Release of version 3.8.8 for pci405 for QNX6            TA
+
+          23.04.2009  QNX6:
+                      Bugfix: Coredump on driver error exit                   TA
+                      Bugfix: -c Option does not work in pci405 driver
+                      Compiled with gcc 4.2.4 from now on
+
+  3.8.11  22.04.2009  Release of version 3.8.11 for pci405 for Linux          AB
+
+          22.04.2009  Linux:                                                  AB
+                      Fixed: Another fix for canRead() in a
+                             multithreaded environment.
+
+  3.8.10  19.03.2009  Rerelease of version 3.8.9                              AB
+                        (gcc-3 for x86 libraries)
+
+  3.8.9   17.03.2009  Release of version 3.8.9 for pci405 for Linux           AB
+
+          03.03.2009  Linux:                                                  MK
+                      Fixed canIoctl commands
+                      (always returned with EINVAL):
+                        NTCAN_IOCTL_ABORT_RX
+                        NTCAN_IOCTL_ABORT_TX
+
+  3.8.8   27.02.2009  Release of version 3.8.8 for pci405 for Linux           AB
+
+          26.02.2009  New Features:                                           AB
+                      New canIoctl commands:
+                        NTCAN_IOCTL_GET_BUS_STATISTIC
+                        NTCAN_IOCTL_GET_CTRL_STATUS
+                        NTCAN_IOCTL_GET_BITRATE_DETAILS
+
+                      Fixed: Small bug in bitrate calculation
+                             (if bitrate was specified numerically,
+                              there was a possibility, that the resulting
+                              TSEG2 was too small)
+                      Linux:
+                      Fixed: Under certain conditions blocking calls
+                             (canRead(), canWrite()) did not work
+                             correctly, when interrupted by signals
+
+          02.02.2009  Linux:                                                  AB
+                      Fixed: Small glitch in BTR table introduced
+                             with 3.8.6 (regarding undocumented,
+                             customer specific indeces)
+
+  3.8.6   10.12.2008  Release of version 3.8.6 for pci200 for Linux           AB
+
+  3.8.6   10.12.2008  Release of version 3.8.6 for pci360 for Linux           AB
+
+  3.8.6   09.12.2008  Release of version 3.8.6 for pci331 for Linux           AB
+
+          04.12.2008  Fixed:  Close/Abortion of an autobaud handle            AB
+                      Change: Autobaud can be combined with LOM, now
+                      Change: Autobaud got optimized (faster detection)
+
+                      SJA1000:
+                      Change: Small changes to predefined baudrates to
+                              increase maximum possible cable length
+                      Fixed:  No more error events, while autobaud
+
+                      USB331:
+                      Fixed:  Baudrate change event
+
+                      PCI405/Linux:
+                      Fixed:  Possibility for a crash on driver load on
+                              SMP systems (this had no consequences for
+                              runtime)
+
+                      Linux:
+                      Fixed:  Build issues up to 2.6.28-RC7
+
+  3.8.5   07.10.2008  Release of version 3.8.5 for mecp52 for QNX6            TA
+
+          07.10.2008  Support for 16/33/66 Mhz MSCAN Clock                    TA
+
+                      QNX:
+                      - New option -C for controller clock overriding.
+
+  3.8.0   02.10.2008  Release of version 3.8.0 for pci331 for RTX 7.x         OT
+
+  3.8.4   23.07.2008  Release of version 3.8.4 for pci331 for QNX6            TA
+
+          23.07.2008  The change of the maximum supported card instances
+                      now works under QNX and is tested with 5 pci331 boards  TA
+
+  3.8.3   22.07.2008  Release of version 3.8.3 for pci331 for QNX6            TA
+
+          22.07.2008  Maximum supported card instances changed from 4 to 16   TA
+
+  3.8.3   06.06.2008  Release of version 3.8.3 for usb331 for Linux           AB
+
+                      NOTE FOR CAN-USB-Mini CUSTOMERS:
+                        esdcan-usb331 supports kernels <= 2.6.24
+                        Kernel 2.6.25 and following can not be supported
+                        right now!
+                        We're working on a new solution for
+                        kernels > 2.6.25, unfortunately this is not
+                        available, yet.
+                        PCI, PCIe or ISA drivers are NOT affected.
+
+          05.06.2008  Linux, Kernel 2.6.x:                                    AB
+                        Hopefully fixed all build issues with
+                        kernels >= 2.6.24
+
+          05.06.2008  Linux (x86_64 kernels < 2.6.10):                        AB
+                      Bugfix: busload IOCTLs didn't work
+
+          04.06.2008  Linux (Kernels > 2.6.10):                               AB
+                      Bugfix: Certain IOCTLs (FLUSH_RX_FIFO,
+                        PURGE_TX_FIFO, SCHEDULE_START, SCHEDULE_STOP,
+                        SET_ALT_RTR_ID) did not work, when used in a
+                        32-Bit application in combination with a x86_64
+                        kernel and driver
+
+          04.06.2008  Linux:                                                  MK
+                        Fixed false load statistics of driver in xosview
+                        and top. This fixes watchdog warnings on
+                        kernels > 2.6.25, too
+
+          03.06.2008  usb331, Linux:                                          MK
+                      Bugfix: System freeze on certain system/kernel
+                              combinations
+
+  3.8.2   23.05.2008  Release of version 3.8.2 for pci200 for QNX6            TA
+
+                      Release of version 3.8.2 for pci405 for QNX6
+
+                      Release of version 3.8.2 for pci360 for QNX6
+
+                      Release of version 3.8.2 for isa200 for QNX6
+
+                      Release of version 3.8.2 for isa331 for QNX6
+
+  3.8.2   23.05.2008  Release of version 3.8.2 for pci405 for Linux           AB
+
+          23.05.2008  Linux: Fixed timeouts influencing canSend()             AB
+
+  3.8.2   23.05.2008  Release of version 3.8.2 for pci331 for QNX6            TA
+
+                      QNX:                                                    TA
+                      - Bugfix: Disarm of timer does not work and causes a
+                        immediate timer run.
+                      - Bugfix: After disarm/change timer expiry
+                        a just queued pulse causes a spurious timer run.
+                      - Better verbose messages
+
+          22.05.2008  Linux: Small fix for new kbuild trees                   MK
+                             (kernels > 2.6.24)
+
+  3.8.0   20.03.2008  Release of version 3.8.0 for pci405 for Linux           AB
+
+          19.03.2008  Linux: Tested with kernels up to 2.6.25                 AB
+
+  3.8.1   19.03.2008  Release of version 3.8.1 for pci405 for W2K/XP          TA
+
+  3.8.1   19.03.2008  Release of version 3.8.1 for pci405 for QNX6            TA
+
+          19.03.2008  pci405:                                                 TA
+                      Bugfix: In rare occasions host driver wasn't
+                              loaded successfully.
+
+  3.8.0   12.03.2008  Release of version 3.8.0 for pci405 for QNX6            TA
+
+  3.8.0   12.03.2008  Release of version 3.8.0 for isa200 for QNX6            TA
+
+  3.8.0   12.03.2008  Release of version 3.8.0 for pci2xx for QNX6            TA
+
+  3.8.0   12.03.2008  Release of version 3.8.0 for pci331 for QNX6            TA
+
+          12.03.2008  QNX6: Bugfix: backend prio is limited to 63
+
+  3.8.0   08.03.2008  Release of version 3.8.0 for pci405 for RTX 7.x         OT
+
+          08.03.2008  RTX:
+                      New feature: Scheduling (drivers for other systems
+                                   had this before)
+                      Bugfix: Prevent handle buffer overrun for Tx I/O
+
+  3.8.0   29.02.2008  Release of version 3.8.0 for pci405 for W2K/XP          TA
+
+  3.8.0   28.02.2008  Major update on scheduling feature:                     TA
+                      - increased accuracy
+                      - automatic data changes (counters, etc.)
+                        Please refer to ntcan.h for now. CAN-API
+                        documentation will follow soon.
+                      - Order of frames with same schedule relates
+                        to their CAN priorities
+                      - Bugfix: "bursts of CAN frames"
+
+  3.7.4   27.02.2008  Release of version 3.7.4 for pci331 for QNX6            TA
+
+          26.02.2008  I20 firmware update added to QNX6 driver                TA
+
+          05.11.2008  Added feature:                                          AB
+                      New commands for canIoctl() for generation of
+                      busload statistics, please refer to CAN-API manual.
+
+  3.7.5   11.07.2007  Release of version 3.7.5 for pci405 for W2K/XP          TA
+
+  3.7.6   09.07.2007  Release of version 3.7.6 for pci2xx for QNX6            TA
+
+  3.7.7   05.06.2007  Release of version 3.7.7 for pci2xx for Linux           AB
+
+          05.06.2007  Linux: New format of release archives:                  AB
+                        Old format (gzipped tar archives (.tgz)) was
+                        changed into password protected zip-archives
+                        (.zip) containing a tar-archive
+                        Password: esdCAN2007
+
+          04.06.2007  SJA1000: Added evaluation of VPD                        AB
+                         => e.g. canStatus() can show serial number
+                      Boards currently supporting this feature:
+                        CAN-PCI104/200, CAN-PCIe/200, CAN-PMC/266
+
+          01.06.2007  Added support for CAN-PMC/266                           AB
+
+  3.7.4   29.05.2007  Release of version 3.7.4 for pci405 for Windows         TA
+
+          28.05.2007  Windows:                                                TA
+                      Bugfix: After first installation of the
+                      wdm pci405 driver you get wrong net numbers in the
+                      settings dialog of the device manager
+                      Bugfix: The first diver start under Vista fails
+
+          24.05.2007  Bugfix: New data is not transmitted                     TA
+                      at the first schedule event after an UPDATE call
+                      but at the second event
+
+          23.05.2007  pci405:                                                 TA
+                      Bugfix: firmware scheduling durations are
+                      wrong on fast systems (Firmware=3.7.2,Driver=3.7.3).
+
+  3.7.6   16.05.2007  Release of version 3.7.6 for pci200 for Linux           AB
+
+  3.7.4   14.05.2007  Release of version 3.7.4 for pci200 for RTX 6.x         OT
+
+          12.05.2007  Corrected name: CAN-PCIe/2000 -> CAN-PCIe/200           AB
+
+          10.05.2007  pci331: Optimized PCI access                            TA
+
+          10.05.2007  pci200: Fixed "Lost TX interrupts on Host-Retry"        TA
+                        On certain systems a TX-Done interrupt could get
+                        lost, resulting in an inability to send CAN frames
+
+  3.7.4   10.05.2007  Release of version 3.7.4 for pci360 for Linux           AB
+
+          02.05.2007  Fixed CAN-PCI/360 firmware (0.C.22) problem with        RA
+                        nets 2+3, which was introduced with release 3.7.3
+
+  3.7.3   05.04.2007  Release of version 3.7.3 for pci360 for Linux           AB
+
+  3.7.5   04.04.2007  Release of version 3.7.5 for pci200                     TA
+                        x86/ppcbe QNX6
+                      New card option "sdid=xxx"
+                      Support of PCI104-200
+
+          01.04.2007  Linux drivers tested up to kernel.org 2.6.20.4          AB
+
+          27.03.2007  Linux: Fixed typo which affected compilation on         AB
+                      Linux kernels < 2.6.10 on x86_64
+
+  3.7.4   22.02.2007  Release of version 3.7.4 for pci405 for                 TA
+                        x86/ppcbe QNX6
+
+  3.7.4   25.01.2007  Release of version 3.7.4 for pci331 for                 AB
+                        PPC-Linux 2.6.x
+
+  3.7.3   15.01.2007  Release of version 3.7.3 for pci405 for Linux           AB
+
+  3.7.4   09.01.2007  Release of version 3.7.4 for pci200 for QNX6            TA
+
+          08.01.2007  QNX6: buffer overflow fixed in ntcan library            TA
+                      QNX6: timeout handling fixed in driver, to use
+                      only one of the 128 pulse codes. Now this no longer
+                      limits the maximal open count in the driver
+
+  3.7.3   05.01.2007  Release of version 3.7.3 for isa200 for Linux           AB
+
+  3.7.3   04.01.2007  Release of version 3.7.3 for pci2xx for Linux           AB
+
+  3.7.3   04.01.2007  Release of version 3.7.3 for pci331 for Linux           AB
+
+          03.01.2007  Added PMC331 (3,3V) to the list of the supported        AB
+                      I20 boards
+
+          02.01.2007  pci331: Small changes to increase robustness in         AB
+                      case of hardware defects
+
+  3.7.3   22.12.2006  Release of version 3.7.3 for usb331 for Linux           AB
+
+          21.12.2006  Linux: Fixed compatibility issues with                  AB
+                      kernels up to 2.6.19
+
+  3.7.3   06.12.2006  Release of version 3.7.3 for pci405 for Windows         TA
+
+  3.7.3   28.11.2006  Release of version 3.7.3 for pci405 for RTX 6.x         OT
+                      RTX: Fixed possible block in driver calling canClose()
+                      RTX: Improved debug output of PCI bus scan.
+
+  3.7.3   23.11.2006  Release of version 3.7.3 for isa200 for QNX 6           TA
+
+  3.7.3   23.11.2006  Release of version 3.7.3 for isa331 for QNX 6           TA
+
+  3.7.3   23.11.2006  Release of version 3.7.3 for pci200 for QNX 6           TA
+
+  3.7.3   23.11.2006  Release of version 3.7.3 for pci331 for QNX 6           TA
+
+          20.11.2006  Support for new bootloader on PCI405 board.             MF
+                      New FPGA image for PCI405 to improve hardware
+                      timstamping and to support a different way to
+                      signal interrupts to the firmware (without using
+                       PCI configuration cycles).
+                      The bootloader if updated through the host
+                      driver. After update the host driver will fail
+                      to load and a reboot of the PC is required!
+                      After the update the PCI405 boards do not work with
+                      any versions before 3.7.2 of the host driver.
+
+          16.11.2006  Linux, Windows, QNX: Fixed RX-Object mode            AB+MT+OT
+
+  3.7.0   30.10.2006  Release of version 3.7.0 for isa331 for Linux           AB
+
+          27.10.2006  Fixed small problem with net 1 in ISA331 firmware       MK
+                      Please use provided updisa331 tool
+
+  3.7.0   13.10.2006  Release of version 3.7.0 for cpci405(ab), c405_20m      MF
+
+  3.7.0   12.10.2006  Release of version 3.7.0 for pci331 for Linux           AB
+
+  3.7.0   12.10.2006  Release of version 3.7.0 for pci405 for Linux           AB
+
+  3.7.0   12.10.2006  Release of version 3.7.0 for pci2xx for Linux           AB
+
+          11.10.2006  Added PCIe2000 (coming SJA1000 based PCIe-board)        AB
+
+          11.10.2006  Linux: Fix for compilation problem with SuSE > 10.0     AB
+
+          29.09.2006  Corrections to BTR calculation                          AB
+
+          29.09.2006  Fixed endianess problem in baudrate change event        AB
+                      (REMOTE-I/F, USB331)
+
+          28.09.2006  Various bugfixes in TX-scheduling                       MK
+
+  3.6.0   14.09.2006  Release of version 3.6.0 for pci266 for QNX 6           MT
+
+  3.6.1   14.09.2006  Release of version 3.6.1 for pci405 for QNX 6           MT
+
+  3.6.0   14.09.2006  Release of version 3.6.0 for pci331 for QNX 6           MT
+
+          04.07.2006  Numerical setting of baudrate for USB331 and 82527      AB
+
+          29.06.2006  Linux-Bugfix: Under certain bus error conditions        AB
+                      it was possible, that a canWrite() returned too
+                      early (reporting zero frames sent) and a subsequent
+                      canWrite() reported too many sent frames (the ones
+                      from the job before). This bug did _not_ lead to
+                      unsent frames or lost data.
+
+          29.06.2006  SJA1000-Bugfix: Under certain bus error conditions      AB
+                      it was possible, that an old frame was sent,
+                      although user job was already aborted.
+
+          29.06.2006  Added features:                                         AB
+                      - Autobaud (automatic baudrate detection)
+                        Currently usable with: SJA1000
+                                               REMOTE-I/F
+                                               MSCAN
+                      - Baudrate change event
+                      - Numerical setting of baudrate (calculation of
+                        BTR values)
+                        Currently usable with: I20 (all except USB331)
+                                               SJA1000
+                                               REMOTE-I/F
+                                               MSCAN
+                      - Extended error information event
+                        Currently generated by: SJA1000
+                                                REMOTE-I/F
+                        NOTE: This feature adds some load to your system
+                              in error conditions (should be negligible,
+                              though).
+                              The behaviour in error conditions has
+                              changed (frames might get aborted before
+                              timeout due to bus errors). New error code
+                              NTCAN_CONTR_ERR_PASSIVE.
+                        NOTE: Under Linux this feature can be
+                              disabled with errorinfo=0 as module
+                              load parameter.
+                       - Type of CAN-controller is reported in upmost byte
+                         of board_status (canStatus())
+
+  3.6.1   19.06.2006  Release of version 3.6.1 for isa200 for QNX 6           MT
+
+  3.6.3   16.06.2006  Release of version 3.6.3 for pci331 for Linux           AB
+
+  3.6.0   02.05.2006  Release of version 3.6.0 for usb331 for Linux           AB
+
+          28.04.2006  USB331:                                                 AB
+                      - added use of hardware timestamping with
+                        firmwares > 0.C.4E
+
+          28.04.2006  Linux USB331:                                           AB
+                      - output of serial number is supported, now
+                      - changed to work with kernels >= 2.6.14
+
+          24.04.2006  Changes for Linux kernel > 2.6.10:                      AB
+                      - use of compat_ioctl
+                        (needed for 32-Bit appplications on 64-Bit systems)
+                      - use of unlocked_ioctl
+                        (might result in performance advantage on SMP
+                         systems)
+
+  3.6.3   21.03.2006  Release of version 3.6.3 for pci200 for RTX 6.x         OT
+
+  3.6.3   20.03.2006  Release of version 3.6.3 for pci360 for RTX 6.x         OT
+
+  3.6.3   16.03.2006  Release of version 3.6.3 for pci331 for RTX 6.x         OT
+
+  3.6.3   13.03.2006  Release of version 3.6.3 for pci405 for RTX 6.x         OT
+
+  3.6.0   08.03.2006  Release of version 3.6.0 for isa200 for QNX 6           MT
+
+  3.6.0   17.02.2006  Release of version 3.6.0 for pci405 for QNX 6           MT
+
+  3.6.0   02.03.2006  Release of version 3.6.0 for cpci750                    MF
+
+  3.6.2   14.02.2006  Release of version 3.6.2 for cpci405                    MF
+
+          14.02.2006  Fixed some compiler warnings when using gcc 4.x         MF
+                      with Linux (on PPC/cpci405: esdcan.c)
+
+                      Pass ARCH=... to kernel make process to allow
+                      cross compilation with 2.6 kernels
+
+  3.6.1   26.01.2006  Release of version 3.6.1 for cpci405, c405_20m          MF
+
+  3.6.2   06.12.2005  Release of version 3.6.2 for pci331 for Linux           AB
+
+          06.12.2005  I20-Bugfix: Possible deadlock on driver unload          AB
+                      This bug needed several things to occurr
+                      simultaneously:
+                        - slow host system
+                        - multiple PCI331
+                        - high load directly before unloading the driver
+
+  3.6.2   05.12.2005  Release of version 3.6.2 for pci331 for RTX 6.x         OT
+
+  3.6.2   05.12.2005  Release of version 3.6.2 for pci405 for RTX 6.x         OT
+
+  3.6.0   08.11.2005  Release of version 3.6.0 for isa200 for Linux           AB
+
+  3.6.1   03.11.2005  Release of version 3.6.1 for pci200 for Linux           AB
+
+  3.6.2   03.11.2005  Release of version 3.6.2 for pci405 for Linux           AB
+
+          03.11.2005  Fixed reinitialization of CAN-controller, if            AB
+                      canSetBaudrate() is called twice with the same
+                      baudrate (bug was introduced with last release,
+                      version 3.6.1 of pci405 appeared in public, only)
+
+  3.6.1   01.11.2005  Release of version 3.6.1 for pci405 for Linux           AB
+
+          31.10.2005  Fixed 800kBit baudrate for SJA1000.                     AB
+
+          31.10.2005  Minor bugfix. When driver was used in "smart            AB
+                      disconnect" mode (driver load option), the driver
+                      removes a controller from the CAN-bus, if there were
+                      no more open handles. Nevertheless canGetBaudrate()
+                      delivered the last configured baudrate. This is fixed.
+
+          27.10.2005  Linux:                                                  AB
+                      Added support for NTCAN_IOCTL_GET_SERIAL
+                      Added support for NTCAN_IOCTL_SET_RX_TIMEOUT
+                      Added support for NTCAN_IOCTL_SET_TX_TIMEOUT
+
+          27.10.2005  Fixed bug with CAN-frames with length greater eight     AB
+                      82527 boards.
+
+          21.10.2005  Some internal changes concerning future extensions     MF+MT
+                      of the CAN driver (no influence on existing
+                      features).
+
+          20.10.2005  Linux and pci405 all platforms:
+                      Fixed bug in 20B-Filter (introduced with 3.6.0 release) MT
+
+          14.09.2005  Fixed bug with CAN-frames with length greater eight     MK
+                      for SJA1000 boards.
+                      Such frames shouldn't be used, but nevertheless the
+                      CAN specification allows such frames and thus these
+                      are correctly supported.
+
+  3.6.1   30.08.2005  Release of version 3.6.1 for pci331 (Linux64)           AB
+
+          29.08.2005  Fixed small bug in PCI-hotplug layer (introduced        AB
+                       with release 3.6.0 of PCI360), concerning mapping
+                       of unwanted IO-spaces on pci200 and pci331
+
+  3.6.0   23.08.2005  Release of version 3.6.0 for pci360 (Linux)             AB
+
+          22.08.2005  NEW TYPE for CAN handles: NTCAN_HANDLE.                 AB
+                      HANDLE is deprecated from now on!
+                      This change got necessary to keep ntcan-library on
+                      all systems compatible with ntcan-library for vxWorks.
+
+          22.08.2005  Fixed bug in PCI-hotplug layer concerning disabled      AB
+                       memory spaces (affecting pci360, only) (Linux)
+
+          22.08.2005  Small bugfix concerning canIdDelete (Linux)             AB
+
+  3.6.0   16.08.2005  Release of version 3.6.0 for pci331 (Linux)             AB
+
+  3.6.0   16.08.2005  Release of version 3.6.0 for pci405 (Linux)             AB
+
+  3.6.2   10.08.2005  Release of version 3.6.2 for pci405 (Windows)           MT
+
+          10.08.2005  Deleting id's (canIdDelete) now working again (Windows) MT
+
+  3.6.0   26.07.2005  Release of verson 3.6.0 for (c)pci200/266 (Linux)       AB
+
+  3.6.0   26.07.2005  Release of verson 3.6.0 for isa331 (Linux)              AB
+
+          26.07.2005  Major changes in system abstraction layer for linux     AB
+                      - PCI driver is hotplug driver, now (driver didn't
+                        receive interrupts at all on certain ACPI systems)
+                      - Cleaned the entire layer and made it more modular
+
+          26.07.2005  Minor bugfix for Linux/ISA drivers (better validation   AB
+                       of IO-address)
+
+          26.07.2005  Minor bugfix in ISA initialization                      AB
+                      Problem occurred only with severeal address spaces
+                      (which we currently don't have on any hardware)
+
+          19.07.2005  One driver-binary can serve different hardware now      AB
+                      (Used for sja1000 derivates under linux at the moment:
+                       PCI200 driver serves for PCI200, PCI266 and CPCI200)
+
+  3.6.0   18.07.2005  Release of version 3.6.0 for pci405 (Windows)           MF
+
+          14.07.2005  New 20B-Filter                                          MT
+                      Note: 20B filtering was possible before, this
+                            corresponds to a more sophisticated way of
+                            filtering with two masks ("as one wants it to
+                            have"), see CAN-API manual.
+
+          13.07.2005  Internal changes, preparation of new features (3.6.x)  MT+MF
+
+  3.5.0   04.07.2005  Release of version 3.5.0 for pci405, pci331 and         OT
+                      pci360 (RTX 5.x)
+
+  3.5.0   01.05.2005  Release of version 3.5.0 for (c)pci360 (Linux)          AB
+
+  3.5.0   30.04.2005  Release of version 3.5.0 for (c)pci331 (Linux)          AB
+
+  3.5.0   30.04.2005  Release of version 3.5.0 for (c)pci200 (Linux)          AB
+
+          28.04.2005  Board names changed (match old driver arch.)            AB
+
+  3.5.0   19.04.2005  Release of version 3.5.0 for pci266 (Linux)             AB
+
+          19.04.2005  Linux drivers are 64-Bit ready (3.5.x)                  AB
+
+  3.4.1   06.04.2005  Release of version 3.4.1 for isa331 (QNX 6)             MT
+
+  3.4.0   06.04.2005  Release of version 3.4.0 for pci331 (QNX 6)             MT
+
+          06.04.2005  Thread pool switched off for i20 cards =>               MT
+                      At the moment no Firmware-Update possible
+                      (this comment refers to QNX, only!!!)
+
+  3.4.0   05.04.2005  Release of version 3.4.0 for isa331 (QNX 6)             MT
+
+  3.4.0   22.03.2005  Release of version 3.4.0 for pci405+pci405fw2 (Linux)   MF
+
+  3.4.0   04.02.2005  Release of version 3.4.0 for cpci200 (Linux)            AB
+
+  3.4.0   28.02.2005  Release of version 3.4.0 for usb331 (Linux)             AB
+
+          22.02.2005  Fixed firmware update for i20-cards                     AB
+
+          21.02.2005  Abort mechanism fixed for i20-cards                     AB
+
+          15.02.2005  Internal interface changes (3.4.x)                     MT+MF
+
+  3.3.2   11.02.2005  Release of version 3.3.2 for c405_20m, cpci405          MF
+
+  3.3.4   07.12.2004  Release of version 3.3.4 for pci266 (Linux k. 2.6)      MT
+
+  3.3.2   07.12.2004  Release of version 3.3.2 for pci200 (Linux k. 2.6)      MT
+
+  3.3.13  02.12.2004  Release of version 3.3.13 for pci405 (IRIX)             SR
+
+          22.11.2004  Added SMART_DISCONNECT-Mode for passive SJA1000 targets MF
+
+  3.3.1   15.11.2004  Release of version 3.3.1 for cpci750                    MF
+
+          15.11.2004  Added new driver "cpci750"                              MF
+
+  3.3.12  10.11.2004  Release for pci405                                      MT
+
+  3.3.2   10.11.2004  Release for usb331 and isa331                           MT
+
+          10.11.2004  Compilable with versioned symbols again                 MT
+
+  3.3.11  09.11.2004  Release for pci405                                      MT
+
+  3.3.1   09.11.2004  Release for usb331 and isa331                           MT
+
+  3.3.1   29.10.2004  Release of version 3.3.1 for cpci405, cpci405ab and
+                      c405_20m                                                MF
+
+          29.10.2004  canSendT and canWriteT in DEFERRED_TX mode now use
+                      real timestamps instead of ticks                        MF
+
+  3.3.0   01.10.2004  Release of version 3.3.0 for usb331 (Linux k. 2.4)      AB
+
+          01.10.2004  Use timestamp latch when possible else use
+                      current free running timestamp                          MF
+
+  3.3.3   17.08.2004  Release of version 3.3.3 for pci266 (Linux k. 2.6)      AB
+
+          16.08.2004  Fixed termination of dpc thread                         MT
+
+  3.3.1   05.08.2004  BETA-release of version 3.3.1 for pci360 (Linux k. 2.6) AB
+
+  3.3.1   20.07.2004  BETA-release of version 3.3.1 for pci200 (Linux k. 2.6) AB
+
+  3.3.4   20.07.2004  BETA-release of version 3.3.4 for pci331 (Linux k. 2.6) AB
+
+  3.3.3   01.07.2004  Release of version 3.3.3 for isa200 (Linux k. 2.6)      MT
+
+          01.07.2004  Fixed regparm-bug in SJA1000(Linux)                     MT
+
+  3.3.1   17.06.2004  Release of version 3.3.1 for cpci405, cpci405ab, c405_20m MF
+
+  3.3.2   04.06.2004  Release of version 3.3.2 for pci266 (Linux k. 2.6)      MT
+
+  3.3.1   28.05.2004  3rd Beta-release of ver. 3.3.1 for PCI331 (Linux k. 2.6)MT
+
+  3.3.1   27.05.2004  Beta-release of ver. 3.3.1 for PCI266 (Linux k. 2.6)    MT
+
+  3.3.1   26.05.2004  2nd Beta-release of ver. 3.3.1 for PCI331 (Linux k. 2.6)MT
+
+  3.3.1   14.05.2004  Beta-release of ver. 3.3.1 for PCI331 (Linux k. 2.6)    AB
+
+  3.3.7   13.05.2004  Beta-release of ver. 3.3.7 for PCI405 (Linux k. 2.6)    AB
+
+          13.05.2004  Fixes in osif-layer for linux for kernel>=2.6.6         AB
+
+  3.3.6   11.05.2004  Beta-release of ver. 3.3.6 for pci405 (Linux k. 2.6)    AB
+
+  3.3.5   11.05.2004  Release of version 3.3.5 for pci405 (IRIX)              SR
+
+          07.05.2004  Merge with linux kernel 2.6 dev-tree (Linux k. 2.6)    AB+MT
+
+          07.05.2004  Reworked hwgraph handling (IRIX)                        SR
+
+          03.05.2004  Switched back to busmastering on PCI405 (IRIX)          SR
+
+  3.3.5   29.04.2004  Release of version 3.3.5 for pci405 (Linux)            AB+MF
+
+  3.3.1   29.04.2004  Release ov version 3.3.1 for isa200 (Linux)             AB
+
+  3.3.0   29.04.2004  Release of version 3.3.0 for I20-Linux (except USB331)  AB
+
+  3.3.0   29.04.2004  Release of version 3.3.0 for pci266+pci200 (Linux)      AB
+
+          28.04.2004  Fixed bug with deadlock on AutoRTR for all I20-cards    AB
+
+          28.04.2004  Fixed bug in upstream-buffer-handling (pci405)          MF
+
+          22.04.2004  Fixed bug in nucleus id filtering, if more than
+                      14 receivers enable the same id.                        MT
+
+          22.04.2004  Fixed bug in ioctl-return values in ntcan-lib (Linux)   AB
+
+          20.04.2004  Improved memory allocation on pci405                    MF
+
+  3.3.0   15.04.2004  Release of version 3.3.0 for all cards(QNX 6)           MT
+
+  3.3.0   13.04.2004  Release of version 3.3.0 for isa200 (Linux)             MT
+
+  3.3.0   08.04.2004  Release of version 3.3.0 for pci405 (Linux)             AB
+
+  3.3.0   08.04.2004  Release of version 3.3.0 for pci405fw                   MF
+
+          07.04.2004  Changed major for 82527-cards (Linux)                   AB
+
+          07.04.2004  Fixed bug in nucleus id handling                        MT
+
+          03.04.2004  Minor busmaster-fix for PCI405 (Linux)                  AB
+
+  3.3.0   31.03.2004  Release of version 3.3.0 for PCI405 (IRIX)              SR
+
+          31.03.2004  Cosmetic changes for clean compile on IRIX (PCI405)     SR
+
+          31.03.2004  Bring IRIX port up to date (mostly lib changes)         SR
+
+          31.03.2004  IOCTL's NTCAN_IOCTL_FLUSH_RX_FIFO and
+                      NTCAN_IOCTL_GET_RX_MSG_COUNT fully implemented         MT+SR
+
+          24.03.2004  CPCI405AB only: Add time-server functionalty to
+                      lateral can for test purposes                           SR
+
+  3.2.0   19.03.2004  Release of version 3.2.0 for 82527-cards (Linux)        AB
+
+  3.2.0   19.03.2004  Release of version 3.2.0 for SJA1000 (Linux)            AB
+
+  3.2.0   19.03.2004  Release of version 3.2.0 for PCI405 (Linux)             AB
+
+  3.2.0   15.03.2004  Release of version 3.2.0 for Linux/PPC Embedded Boards
+                      (cpci405, c405_20m, cpci405ab)                          MF
+
+          15.03.2004  DEFERRED_TX_MODE is now enabled by default.
+                      For internal use, only!                                 MF
+
+          14.03.2004  Bugfix for bus-error handling of 82527-cards            AB
+
+          14.03.2004  Bugfix in abortion of tx-jobs for 82527-cards           AB
+
+          12.03.2004  added DEFERRED_TX_MODE for internal use. This new
+                      feature is used by canWriteT/canSendT.                  MF
+
+  3.1.1   05.03.2004  Release of version 3.1.1 for PCI405/Linux               AB
+
+          05.03.2004  Corrected AutoRTR-handling (all platforms)             AB+MT
+
+          05.03.2004  ntcan-Library v3 (one library for old and new driver)   AB
+
+          05.03.2004  read+write changed to ioctls (linux)                   MF+MT
+
+  3.1.1   24.02.2004  Release of version 3.1.1 for QNX 6                      MT
+                      Sending of rtr frames possible again
+                      canTxObj now works, needed for canOpen
+
+  3.1.0   04.02.2004  Release of 3.1.0 for I20-Linux (except USB331)          AB
+
+          04.02.2004  Corrected return-code of blocking calls (read+write)
+                      after signal (ERESTARTSYS) (Linux)                      AB
+
+  3.1.0   02.02.2004  Release of version 3.1.0 for QNX 6                      MT
+                      1st Release with time-stamped canRead/Take
+
+          02.02.2004  Workaround in i20 interrupt-check for QNX               MT
+
+          29.01.2004  new option "-p prio" for qnx                            MT
+
+          07.01.2004  Changed timestamp code from period to
+                      frequency handling                                      MF
+
+          06.01.2004  Fixed bug in signal handling (all)                      MF
+
+          06.01.2004  Do not touch frontpanel LEDs on cpci405ab boards
+                      during driver load                                      MF
+
+          06.01.2004  Added event-msg generation for SJA1000 cards            MF
+                      (canReadEvent now reports bus status changes)
+
+          17.12.2003  "Ghost-msg-losts" fixed for all cards and systems       MT
+
+          17.12.2003  Added pci266-support                                    AB
+
+  3.0.4   02.12.2003  Release of version 3.0.4 for I20-Linux (except USB331)  AB
+
+          01.12.2003  Fixed OSIF_IRQ_MUTEX_CREATE for SP-systems (Linux)     AB+MT
+
+          01.12.2003  Prepared i20-cards for new baudrate-definitions
+                      (firmware needs to follow)                              AB
+
+          01.12.2003  Fixed canClose for isa331 and usb331                    AB
+
+  3.0.3   13.11.2003  Release of version 3.0.3 for I20-Linux (except USB331)  AB
+
+          13.11.2003  OSIF_TIMER as DPC                                       MT
+
+          13.11.2003  Reduced board-parts to boardrc for I20-cards            AB
+
+          13.11.2003  Reduced time on interrupt-level for all I20-cards     AB + MT
+                      to minimum
+
+          13.11.2003  Bugfix (Linux): - Deadlocks on abort and timeout      AB + MT
+                                      - Problems on highspeed (Multi-GHz)
+                                        and/or "fast-clock-tick"-systems
+
+          11.11.2003  Fixed SMP-problems with I20-cards                     AB + MT
+
+          11.11.2003  Added USB331-support (Hotplugging still instable)       AB
+
+          05.11.2003  Removed upd.c (I20), now using updx.c from candev       AB
+
+          05.11.2003  Fixed PCI360 (Detection of CPCI360 failed)              AB
+                      (Added support for four subvendor and subsystem-IDs
+                      (Linux))
+
+          27.10.2003  Corrected usage of output macros (All)                  AB
+
+  3.0.2   08.10.2003  Release of version 3.0.2 for CPCI405/AB, C405_20M       MF
+
+          08.10.2003  Added timestamps for CMSGs received through interaction MF
+                      (all boards with direct SJA1000 access)
+
+          08.10.2003  Clean up of SJA1000 error handling in ISR               MF
+                      (all boards with direct SJA1000 access)
+
+  3.0.2   06.10.2003  Release of version 3.0.2 for PCI-405 IRIX               SR
+
+          30.09.2003  Fix memory leak in pci405 irix port (occured upon
+                      canClose)                                               SR
+
+          29.09.2003  canTake internal return value changed from EIO
+                      to OSIF_OK (Linux & IRIX)                               SR
+
+          29.09.2003  esdcan_read/write_common (Linux & IRIX): called with
+                      node-mutex already already locked                       SR
+
+          29.09.2003  Corrected canSend return code to NTCAN_CTRL_BUSY
+                      when TX-queue is full (instead of
+                      NTCAN_INSUFICIENT_RESOURCES).                           MF
+
+          19.09.2003  Single DPC thread for all nodes.                        MT
+
+  3.0.1   10.09.2003  Internal Release                                        SR
+                      Code merge of IRIX port with esdcan main source tree
+
+  3.0.0   01.08.2003  Initial release                                         AB+MF
