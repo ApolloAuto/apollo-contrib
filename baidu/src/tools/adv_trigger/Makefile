@@ -2,7 +2,7 @@ SRCDIR = .
 CC = gcc
 LIB_PATH = ../../lib/adv_trigger
 ZYNQ_INC = ../../../include/uapi/
-CFLAGS = -I$(LIB_PATH) -I$(ZYNQ_INC) -static
+CFLAGS = -I$(LIB_PATH) -I$(ZYNQ_INC) -static -O2
 
 all: adv_trigger
 
