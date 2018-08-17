@@ -3,7 +3,7 @@
 #
 
 CC=gcc
-CFLAGS=-Wall -m64
+CFLAGS=-Wall -m64 -O2
 SRC=./bcan_lib.c
 INC=../../../include/uapi/
 
