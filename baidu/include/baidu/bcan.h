@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2017 The Apollo Authors. All Rights Reserved.
+ * Copyright 2018 The Apollo Authors. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *****************************************************************************/
- 
-/*
- * @file bcan.h
- *
- * Baidu ADV (Autonomous Driving Vehicle) bcan library definitions.
- * 
- * Please refer to docs/Baidu_CAN_APIs.txt for references.
- */
 
-#ifndef ADU_PLAT_SW_LIB_BCAN_BCAN_H
-#define ADU_PLAT_SW_LIB_BCAN_BCAN_H
+#ifndef BCAN_H
+#define BCAN_H
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -95,4 +87,4 @@ int bcan_get_err_counter(bcan_hdl_t hdl, uint8_t *rx_err, uint8_t *tx_err);
 }
 #endif
 
-#endif  /* ADU_PLAT_SW_LIB_BCAN_BCAN_LIB_H */
+#endif  /* BCAN_H */

@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2017 The Apollo Authors. All Rights Reserved.
+ * Copyright 2018 The Apollo Authors. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *****************************************************************************/
- 
-/**
- * @file adv_trigger_ctl.h
- *
- * Baidu ADV (Autonomous Driving Vehicle) hardware trigger library, definitions.
- *
- */
 
-#ifndef ADU_PLAT_SW_LIB_ADV_TRIGGER_CTL_H
-#define ADU_PLAT_SW_LIB_ADV_TRIGGER_CTL_H
+#ifndef ADV_TRIGGER_H
+#define ADV_TRIGGER_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +51,7 @@ int adv_trigger_delay_ctl(const char *video_path, int action,
 #define	FLAG_PPS_VALID		(1 << 1)
 
 /* FPGA board trigger status. */
-struct adv_zynq_status {
+struct adv_trigger_status {
 	struct {
 		int flags;
 		char zdev_name[ZYNQ_DEV_NAME_LEN];
@@ -75,12 +68,12 @@ struct adv_zynq_status {
  *  0: successful;
  *  non-0: there is an error.
  */
-int adv_trigger_status(struct adv_zynq_status *status);
+int adv_trigger_get_status(struct adv_trigger_status *status);
 
-const char *get_adv_trigger_version(void);
+const char *adv_trigger_version(void);
 
 #ifdef __cplusplus
-}  // extern "C"
+}
 #endif
 
-#endif  // ADU_PLAT_SW_LIB_ADV_TRIGGER_ADV_TRIGGER_CTL_H
+#endif  /* ADV_TRIGGER_H */
