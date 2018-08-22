@@ -1,14 +1,11 @@
-This repository contains code/binary contributed by Baidu to the Apollo Autonomous Driving Project that can't or is not suitable to be distributed under Apache license.
+This repository contains code contributed by Baidu to the Apollo Autonomous Driving Project that can't or is not suitable to be distributed under Apache license.
 
 Directory structure:
 
-- bin/: binary programs
 - docs/: documentations
-- drivers/: driver source code
-- include/: header files for user space library/application development
-  - include/baidu/: library headers
-  - uapi/: header files for writing user space program against kernel driver(s)
-- lib/: binary library files (.a, .so)
-- linux/: binary release of kernel driver(s)
-  - linux/drivers: binary drivers organized by kernel version
-  - linux/include: header files for writing user space program against the binary driver
+- src/: source code
+  - lib/adv_trigger: source code of the adv_trigger library
+  - lib/bcan: source code of the bcan library
+  - tools/adv_trigger: source code of the adv_trigger user tool
+  - kernel/include/uapi/linux: header files for writing user programs against the basa driver
+  - kernel/drivers/baidu/basa: source code of the baidu sensor aggregation (basa) driver

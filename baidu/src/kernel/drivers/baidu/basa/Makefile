@@ -2,6 +2,8 @@
 # Makefile for Baidu Sensor Aggregation driver
 #
 
+BAIDUROOT=../../../../..
+
 obj-m += basa.o
 basa-objs := basa_driver.o basa_intr.o \
 	basa_main.o basa_chan.o basa_sysfs.o basa_fwupdate.o \
@@ -14,6 +16,13 @@ PWD := $(shell pwd)
 
 default:
 	${MAKE} -C ${KERNEL_SOURCE} M=${PWD} $(MAKE_OPTS) modules
+
 clean:
 	${MAKE} -C ${KERNEL_SOURCE} M=${PWD} clean
 	rm -f *.o.ur-safe
+
+install: default
+	mkdir -p $(BAIDUROOT)/output/kernel/drivers/baidu/basa
+	mkdir -p $(BAIDUROOT)/output/include
+	cp basa.ko $(BAIDUROOT)/output/kernel/drivers/baidu/basa/
+	cp -r ../../../include/uapi/linux $(BAIDUROOT)/output/include/
