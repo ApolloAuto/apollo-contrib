@@ -2,19 +2,38 @@
 # Makefile for Baidu CAN library
 #
 
+BAIDUROOT=../../..
+VERSION=3.0.0.1
+SONAME=libadv_bcan.so.1
+
 CC=gcc
-CFLAGS=-Wall -m64 -O2
-SRC=./bcan_lib.c
-INC=../../../include/uapi/
+CFLAGS=-Wall -march=native -O2 -pipe -DLIB_VER='"$(VERSION)"'
+SOFLAGS=-fPIC -shared -Wl,-soname,$(SONAME)
+AR=ar
+INC=$(BAIDUROOT)/src/kernel/include/uapi
+SRC=bcan_lib.c
+OBJ=bcan_lib.o
+HDR=bcan.h
+LIB=libadv_bcan.a
+LIBSO=libadv_bcan.so.$(VERSION)
 
-all: lib_bcan_a lib_bcan_so
+.PHONY:all
+all: $(LIB) $(LIBSO)
 
-lib_bcan_a: bcan_lib.c bcan.h
-	$(CC) $(CFLAGS) -I$(INC) -c -o bcan_lib.o $(SRC)
-	$(AR) rcs libadv_bcan.a bcan_lib.o
+$(LIB): $(SRC)
+	$(CC) $(CFLAGS) -c -o $(OBJ) -I$(INC) $(SRC)
+	$(AR) rcs $(LIB) $(OBJ)
 
-lib_bcan_so:
-	$(CC) $(CFLAGS) -I$(INC) -fPIC -shared -o libadv_bcan.so $(SRC)
+$(LIBSO):
+	$(CC) $(CFLAGS) $(SOFLAGS) -o $(LIBSO) -I$(INC) $(SRC)
 
+.PHONY:install
+install: all
+	mkdir -p $(BAIDUROOT)/output/lib $(BAIDUROOT)/output/include
+	cp $(LIB) $(BAIDUROOT)/output/lib/
+	cp $(LIBSO) $(BAIDUROOT)/output/lib/
+	cp $(HDR) $(BAIDUROOT)/output/include/
+
+.PHONY:Clean
 clean:
-	rm -f *.o *.so *.a
+	rm -f *.o $(LIB) $(LIBSO)
