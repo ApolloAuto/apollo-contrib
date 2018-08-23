@@ -1,13 +1,30 @@
-SRCDIR = .
-CC = gcc
-LIB_PATH = ../../lib/adv_trigger
-ZYNQ_INC = ../../../include/uapi/
-CFLAGS = -I$(LIB_PATH) -I$(ZYNQ_INC) -static -O2
+#
+# Makefile for adv_trigger tool
+#
 
-all: adv_trigger
+BAIDUROOT=../../..
+CC=gcc
+CFLAGS=-Wall -march=native -O2 -pipe -static
+LIB_PATH=../../lib/adv_trigger
+LIB=$(LIB_PATH)/libadv_trigger.a
+INC=$(BAIDUROOT)/src/kernel/include/uapi
+SRC=adv_trigger.c
+OBJ=adv_trigger
 
-adv_trigger: $(SRCDIR)/adv_trigger.c
-	$(CC) $(CFLAGS) -o adv_trigger -L$(LIB_PATH) $(SRCDIR)/adv_trigger.c -ladv_trigger_ctl
+.PHONY:all
+all: $(OBJ)
 
+$(OBJ): $(SRC) $(LIB)
+	$(CC) $(CFLAGS) -I$(INC) -I$(LIB_PATH) -o $(OBJ) -L$(LIB_PATH) $(SRC) -ladv_trigger
+
+$(LIB):
+	$(MAKE) -C $(LIB_PATH)
+
+.PHONY:install
+install: all
+	mkdir -p $(BAIDUROOT)/output/bin
+	cp $(OBJ) $(BAIDUROOT)/output/bin/
+
+.PHONY:clean
 clean:
-	rm -f adv_trigger
+	rm -f $(OBJ)

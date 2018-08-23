@@ -57,13 +57,11 @@ struct adv_trigger {
 
 #define	PATH_LEN		128
 
-#define	ADV_TRIGGER_CTL_VER	"3.0.0.1"
-
 #define	adv_plat_log_fn(s...)	syslog(LOG_ERR, s)
 
 const char *adv_trigger_version(void)
 {
-	return ADV_TRIGGER_CTL_VER;
+	return LIB_VER;
 }
 
 static int adv_trigger_device_type(const char *driver)

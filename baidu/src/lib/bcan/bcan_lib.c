@@ -26,8 +26,6 @@
 #include "linux/zynq_api.h"
 #include "bcan.h"
 
-const char libbcan_version[] = "3.0.0.1";
-
 #define	BLOG_DBG(s...)	syslog(LOG_DEBUG, s)
 #define	BLOG_ERR(s...)	syslog(LOG_ERR, s)
 
@@ -42,7 +40,7 @@ typedef struct bcan_ihdl {
 
 const char *bcan_get_libversion(void)
 {
-	return libbcan_version;
+	return LIB_VER;
 }
 
 const char *bcan_get_err_msg(int err_code)
