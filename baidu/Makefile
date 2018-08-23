@@ -1,3 +1,6 @@
+#
+# Makefile for Baidu softwares
+#
 
 LIBADV_TRIGGER=src/lib/adv_trigger
 LIBADV_BCAN=src/lib/bcan
