@@ -69,6 +69,7 @@ static int zynq_trigger_enable_all(zynq_dev_t *zdev, unsigned long arg,
 
 		zvideo->fps = trigger->fps;
 		zvideo->frame_interval = USEC_PER_SEC / trigger->fps;
+		zvideo->frame_usec_max = zvideo->frame_interval * zvideo->fps;
 	}
 
 	/* 3. enable the global trigger */
@@ -115,6 +116,7 @@ static int zynq_trigger_disable_all(zynq_dev_t *zdev)
 
 		zvideo->fps = 0;
 		zvideo->frame_interval = 0;
+		zvideo->frame_usec_max = 0;
 	}
 	spin_unlock(&zdev->zdev_lock);
 

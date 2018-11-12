@@ -55,13 +55,11 @@
 #define	ZYNQ_HW_CAP_FW			(1 << 3)
 #define	ZYNQ_HW_CAP_I2C			(1 << 4)
 #define	ZYNQ_HW_CAP_VIDEO		(1 << 5)
+#define	ZYNQ_HW_CAP_FPGA_TIME_INIT	(1 << 6)
+#define	ZYNQ_HW_CAP_GPS_SMOOTH		(1 << 7)
 
-enum zynq_dev_stats {
-	DEV_STATS_INTR = 0,
-	DEV_STATS_INTR_INVALID,
-	DEV_STATS_GPS_UNLOCK,
-	DEV_STATS_NUM
-};
+#define	ZYNQ_CAP(zdev, cap)		\
+	((zdev)->zdev_hw_cap & ZYNQ_HW_CAP_ ## cap)
 
 /* Zynq device structure */
 typedef struct zynq_dev {
@@ -113,6 +111,7 @@ typedef struct zynq_dev {
 	struct tasklet_struct	zdev_ta[ZYNQ_INT_PER_CARD];
 	struct completion	zdev_gpspps_event_comp;
 	struct timespec		zdev_gps_ts;	/* last valid GPS timestamp */
+	unsigned int		zdev_gps_smoothing;
 
 	/* channels */
 	zynq_chan_t		*zdev_chans;
@@ -167,8 +166,7 @@ typedef struct zynq_dev {
 /*
  * Register read/write functions
  */
-static inline u32
-zynq_g_reg_read(zynq_dev_t *zdev, u32 reg)
+static inline u32 zynq_g_reg_read(zynq_dev_t *zdev, u32 reg)
 {
 	u32 val = 0;
 
@@ -180,8 +178,7 @@ zynq_g_reg_read(zynq_dev_t *zdev, u32 reg)
 	return (val);
 }
 
-static inline void
-zynq_g_reg_write(zynq_dev_t *zdev, u32 reg, u32 val)
+static inline void zynq_g_reg_write(zynq_dev_t *zdev, u32 reg, u32 val)
 {
 	if (!zynq_bringup_param) {
 		ZDEV_G_REG32(zdev, reg) = val;
@@ -190,8 +187,7 @@ zynq_g_reg_write(zynq_dev_t *zdev, u32 reg, u32 val)
 	    zdev->zdev_inst, __FUNCTION__, val, reg);
 }
 
-static inline u32
-zynq_bar2_reg_read(zynq_dev_t *zdev, u32 reg)
+static inline u32 zynq_bar2_reg_read(zynq_dev_t *zdev, u32 reg)
 {
 	u32 val = 0;
 
@@ -203,8 +199,7 @@ zynq_bar2_reg_read(zynq_dev_t *zdev, u32 reg)
 	return (val);
 }
 
-static inline void
-zynq_bar2_reg_write(zynq_dev_t *zdev, u32 reg, u32 val)
+static inline void zynq_bar2_reg_write(zynq_dev_t *zdev, u32 reg, u32 val)
 {
 	if (!zynq_bringup_param) {
 		ZDEV_BAR2_REG32(zdev, reg) = val;
@@ -213,8 +208,7 @@ zynq_bar2_reg_write(zynq_dev_t *zdev, u32 reg, u32 val)
 	    zdev->zdev_inst, __FUNCTION__, val, reg);
 }
 
-static inline u32
-zchan_reg_read(zynq_chan_t *zchan, u32 reg)
+static inline u32 zchan_reg_read(zynq_chan_t *zchan, u32 reg)
 {
 	u32 val = 0;
 
@@ -226,8 +220,7 @@ zchan_reg_read(zynq_chan_t *zchan, u32 reg)
 	return (val);
 }
 
-static inline void
-zchan_reg_write(zynq_chan_t *zchan, u32 reg, u32 val)
+static inline void zchan_reg_write(zynq_chan_t *zchan, u32 reg, u32 val)
 {
 	if (!zynq_bringup_param) {
 		ZCHAN_REG32(zchan, reg) = val;
@@ -236,8 +229,7 @@ zchan_reg_write(zynq_chan_t *zchan, u32 reg, u32 val)
 	    ZYNQ_INST(zchan), zchan->zchan_num, __FUNCTION__, val, reg);
 }
 
-static inline u32
-zcan_reg_read(zynq_can_t *zcan, u32 reg)
+static inline u32 zcan_reg_read(zynq_can_t *zcan, u32 reg)
 {
 	u32 val = 0;
 
@@ -249,8 +241,7 @@ zcan_reg_read(zynq_can_t *zcan, u32 reg)
 	return (val);
 }
 
-static inline void
-zcan_reg_write(zynq_can_t *zcan, u32 reg, u32 val)
+static inline void zcan_reg_write(zynq_can_t *zcan, u32 reg, u32 val)
 {
 	if (!zynq_bringup_param) {
 		ZCAN_REG32(zcan, reg) = val;
@@ -260,8 +251,7 @@ zcan_reg_write(zynq_can_t *zcan, u32 reg, u32 val)
 	    ZYNQ_INST(zcan->zchan), zcan->zcan_ip_num, __FUNCTION__, val, reg);
 }
 
-static inline u32
-zvideo_reg_read(zynq_video_t *zvideo, u32 reg)
+static inline u32 zvideo_reg_read(zynq_video_t *zvideo, u32 reg)
 {
 	u32 val = 0;
 
@@ -274,8 +264,7 @@ zvideo_reg_read(zynq_video_t *zvideo, u32 reg)
 	return (val);
 }
 
-static inline void
-zvideo_reg_write(zynq_video_t *zvideo, u32 reg, u32 val)
+static inline void zvideo_reg_write(zynq_video_t *zvideo, u32 reg, u32 val)
 {
 	if (!zynq_bringup_param) {
 		ZVIDEO_REG32(zvideo, reg) = val;
@@ -289,7 +278,7 @@ zvideo_reg_write(zynq_video_t *zvideo, u32 reg, u32 val)
 extern zynq_dev_t *zynq_zdev_init(unsigned short zdev_did);
 extern int zynq_alloc_irq(zynq_dev_t *zdev);
 extern void zynq_free_irq(zynq_dev_t *zdev);
-extern void zynq_check_fw_version(zynq_dev_t *zdev);
+extern void zynq_check_hw_caps(zynq_dev_t *zdev);
 extern int zynq_create_cdev_all(zynq_dev_t *zdev);
 extern void zynq_destroy_cdev_all(zynq_dev_t *zdev);
 
@@ -326,5 +315,6 @@ extern unsigned int zynq_fwupdate_param;
 extern unsigned int zynq_enable_can_rx_dma;
 extern unsigned int zynq_enable_can_tx_dma;
 extern spinlock_t zynq_g_lock;
+extern spinlock_t zynq_gps_lock;
 
 #endif	/* _BASA_H_ */

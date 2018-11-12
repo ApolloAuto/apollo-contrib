@@ -35,6 +35,7 @@ unsigned int zynq_stats_log_interval = 1;
 
 /* driver global variables */
 spinlock_t zynq_g_lock;
+spinlock_t zynq_gps_lock;
 static int zynq_instance = 0;
 static unsigned int zynq_can_count = 0;
 static struct zynq_dev *zynq_dev_list = NULL;
@@ -189,6 +190,8 @@ void zynq_chan_err_proc(zynq_chan_t *zchan)
 	default:
 		break;
 	}
+
+	zchan_err_mask(zchan, ch_err_status);
 
 	/* clear the errors */
 	zchan_reg_write(zchan, ZYNQ_CH_ERR_STATUS, ch_err_status);
@@ -506,17 +509,6 @@ static int zynq_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	zynq_instance++;
 	spin_unlock(&zynq_g_lock);
 
-	snprintf(zdev->prefix, ZYNQ_LOG_PREFIX_LEN, "%d", zdev->zdev_inst);
-	zdev_stats_init(zdev);
-
-	/* the string lengh should be less than ZYNQ_DEV_NAME_LEN */
-	snprintf(zdev->zdev_name, sizeof(zdev->zdev_name),
-	    "%s%d-%s-%04x-%02x-%02x-%x", ZYNQ_DRV_NAME, zdev->zdev_inst,
-	    zdev->zdev_code_name, pci_domain_nr(pdev->bus),
-	    pdev->bus->number, pdev->devfn >> 3, pdev->devfn & 0x7);
-	zynq_trace(ZYNQ_TRACE_PROBE, "FPGA device <%x,%x> %s\n",
-	    pdev->vendor, pdev->device, zdev->zdev_name);
-
 	zdev->zdev_pdev = pdev;
 	pci_read_config_word(pdev, PCI_VENDOR_ID, &zdev->zdev_vid);
 	pci_read_config_word(pdev, PCI_DEVICE_ID, &zdev->zdev_did);
@@ -543,14 +535,12 @@ static int zynq_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	    bar_start, bar_len, zdev->zdev_bar0);
 
 	zdev->zdev_version = zynq_g_reg_read(zdev, ZYNQ_G_VERSION);
-	if (zdev->zdev_version == -1) {
+	if (zdev->zdev_version == (unsigned int)-1) {
 		zynq_err("%s Bar0 register access error, invalid version=-1, "
 		    "please try rebooting ...\n", __FUNCTION__);
 		err = -EFAULT;
 		goto err_ioremap_bar2;
 	}
-
-	zynq_check_fw_version(zdev);
 
 	/* BAR2: CAN IP registers */
 	bar_start = pci_resource_start(pdev, 2);
@@ -565,6 +555,19 @@ static int zynq_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	zynq_trace(ZYNQ_TRACE_PROBE, "%s map bar2: bar_start=0x%llx, "
 	    "bar_len=%d, bar_va=0x%p.\n", __FUNCTION__, bar_start, bar_len,
 	    zdev->zdev_bar2);
+
+	zynq_check_hw_caps(zdev);
+
+	/* the string lengh should be less than ZYNQ_DEV_NAME_LEN */
+	snprintf(zdev->zdev_name, sizeof(zdev->zdev_name),
+	    "%s%d-%s-%04x-%02x-%02x-%x", ZYNQ_DRV_NAME, zdev->zdev_inst,
+	    zdev->zdev_code_name, pci_domain_nr(pdev->bus),
+	    pdev->bus->number, pdev->devfn >> 3, pdev->devfn & 0x7);
+	zynq_trace(ZYNQ_TRACE_PROBE, "FPGA device <%x,%x> %s\n",
+	    pdev->vendor, pdev->device, zdev->zdev_name);
+
+	snprintf(zdev->prefix, ZYNQ_LOG_PREFIX_LEN, "%d", zdev->zdev_inst);
+	zdev_stats_init(zdev);
 
 	/* init each channel */
 	zchan = zdev->zdev_chans;
@@ -583,7 +586,7 @@ static int zynq_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_chan_init;
 	}
 
-	/* sysfs support: create /sys/zynq-* */
+	/* sysfs support */
 	if (zynq_sysfs_init(zdev)) {
 		goto err_sysfs_init;
 	}
@@ -723,7 +726,7 @@ static struct pci_driver zynq_pci_driver = {
 };
 
 /*
- * sysfs support for "/sys/module/basa/zdev_all"
+ * sysfs support for zdev_all
  */
 static ssize_t zynq_zdev_all_show(struct kobject *kobj,
     struct kobj_attribute *attr, char *buf)
@@ -735,7 +738,7 @@ static ssize_t zynq_zdev_all_show(struct kobject *kobj,
 	zdev = zynq_dev_list;
 	if (zdev == NULL) {
 		spin_unlock(&zynq_g_lock);
-		return sprintf(buf + len, "\nNo zynq device is found!\n");
+		return sprintf(buf + len, "\nNo FPGA device is found!\n");
 	}
 
 	while (zdev) {
@@ -817,6 +820,7 @@ int zynq_module_init(void)
 	int error;
 
 	spin_lock_init(&zynq_g_lock);
+	spin_lock_init(&zynq_gps_lock);
 
 	/* allocate a major number */
 	if (zynq_major) {
@@ -862,7 +866,7 @@ int zynq_module_init(void)
 		zynq_err("%s: failed to find the driver module\n", __FUNCTION__);
 		goto err;
 	}
-	/* create /sys/module/zynq/zdev_all */
+	/* create zdev_all */
 	zynq_kobject = &zmod->mkobj.kobj;
 	error = sysfs_create_file(zynq_kobject, &zdev_all_attribute.attr);
 	if (!error) {

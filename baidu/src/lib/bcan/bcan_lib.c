@@ -26,7 +26,11 @@
 #include "linux/zynq_api.h"
 #include "bcan.h"
 
+#ifdef DEBUG
 #define	BLOG_DBG(s...)	syslog(LOG_DEBUG, s)
+#else
+#define	BLOG_DBG(s...)	do {} while (0)
+#endif
 #define	BLOG_ERR(s...)	syslog(LOG_ERR, s)
 
 typedef struct bcan_ihdl {

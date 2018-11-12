@@ -22,31 +22,14 @@
 
 struct zynq_dev;
 
+#define	ZCHAN_ERR_THROTTLE	100 /* msec */
+
 #define	ZYNQ_CHAN_INT_RX_INDEX		0
 #define	ZYNQ_CHAN_INT_RXERR_INDEX	1
 #define	ZYNQ_CHAN_INT_TX_INDEX		2
 #define	ZYNQ_CHAN_INT_TXERR_INDEX	3
 #define	ZYNQ_CHAN_INT_RXALL_INDEX	0
 #define	ZYNQ_CHAN_INT_TXALL_INDEX	1
-
-/* common Zynq device and chanel definition */
-enum zynq_chan_type {
-	ZYNQ_CHAN_INVAL,
-	ZYNQ_CHAN_CAN,		/* CAN channel */
-	ZYNQ_CHAN_VIDEO,	/* Video channel */
-	ZYNQ_CHAN_TYPE_NUM
-};
-
-enum zynq_chan_stats {
-	CHAN_STATS_RX_INTR = 0,
-	CHAN_STATS_TX_INTR,
-	CHAN_STATS_RX_ERR_INTR,
-	CHAN_STATS_TX_ERR_INTR,
-	CHAN_STATS_RX_DROP,
-	CHAN_STATS_RX,
-	CHAN_STATS_TX,
-	CHAN_STATS_NUM
-};
 
 #define	ZYNQ_CHAN_PROC_TX	(1<<0)
 #define	ZYNQ_CHAN_PROC_TX_ERR	(1<<1)
@@ -194,6 +177,11 @@ typedef struct zynq_chan {
 	/* Channel statistics */
 	zynq_stats_t		stats[CHAN_STATS_NUM];
 	char			prefix[ZYNQ_LOG_PREFIX_LEN];
+
+	struct completion	watchdog_completion;
+	struct task_struct	*watchdog_taskp;
+	unsigned int		watchdog_interval;
+	unsigned long		ts_err[32];
 } zynq_chan_t;
 
 extern void zchan_fini(zynq_chan_t *zchan);
@@ -208,5 +196,7 @@ extern void *zchan_alloc_consistent(struct pci_dev *pdev,
     dma_addr_t *dmap, size_t sz);
 extern void zchan_free_consistent(struct pci_dev *pdev, void *ptr,
     dma_addr_t dma, size_t sz);
+extern void zchan_err_mask(zynq_chan_t *zchan, uint32_t ch_err);
+extern void zchan_watchdog_complete(zynq_chan_t *zchan);
 
 #endif	/* _BASA_CHAN_H_ */

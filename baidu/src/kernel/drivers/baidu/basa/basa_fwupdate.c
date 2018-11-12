@@ -35,8 +35,9 @@
 #define	ZYNQ_PS_WAIT_FWUPDATE_RETRIES	600	/* n * 200ms = 2m */
 #define	ZYNQ_FW_TIMEOUT			1000	/* 1 second: in mili-seonds */
 
-#define	ZYNQ_FW_TYPE_PS			1
-#define	ZYNQ_FW_TYPE_PL			2
+#define	ZYNQ_FW_TYPE_MMC		1
+#define	ZYNQ_FW_TYPE_QSPI		2
+#define	ZYNQ_FW_TYPE_SPI		3
 
 /*
  * In firmware updating mode, only channel 0 is enabled to perform in-field
@@ -49,9 +50,9 @@
  *    - S/W sends image data to FPGA in unit of 16 bytes: write ZYNQ_PS_DATA_*
  *      registers in sequence (needs to make sure ZYNQ_PS_PIO_TX_FULL is not
  *      set in register ZYNQ_PS_PIO_STATUS before sending next 16 bytes of data.
- *    - S/W requests FPGA to update PL fabric image or PS OS image by writing
- *      ZYNQ_G_CONFIG register with ZYNQ_CONFIG_FW_UPDATE_PL or
- *      ZYNQ_CONFIG_FW_UPDATE_PS.
+ *    - S/W requests FPGA to update QSPI flash/eMMC flash or SPI flash image by
+ *      writing ZYNQ_G_CONFIG register with ZYNQ_CONFIG_FW_UPDATE_QSPI,
+ *      ZYNQ_CONFIG_FW_UPDATE_MMC or ZYNQ_CONFIG_FW_UPDATE_SPI.
  *    - S/W waits interrupt ZYNQ_PS_INTR_FWUPDATE_DONE for FPGA ARM OS finishes
  *      image update.
  *    - Power cycle system and check FPGA image version from driver prints in
@@ -99,7 +100,7 @@ static int zynq_fw_upload_start(zynq_dev_t *zdev)
 	return 0;
 }
 
-static int zynq_fw_update(zynq_dev_t *zdev, int fw_type)
+static int zynq_fw_update(zynq_dev_t *zdev, int fw_type, int time_to_wait)
 {
 	u32 val32, fw_enable;
 	int j = 0;
@@ -107,10 +108,12 @@ static int zynq_fw_update(zynq_dev_t *zdev, int fw_type)
 	/* add some delay here to make sure the uploading is fully done */
 	msleep(1);
 
-	if (fw_type == ZYNQ_FW_TYPE_PS) {
-		fw_enable = ZYNQ_CONFIG_FW_UPDATE_PS;
-	} else if (fw_type == ZYNQ_FW_TYPE_PL) {
-		fw_enable = ZYNQ_CONFIG_FW_UPDATE_PL;
+	if (fw_type == ZYNQ_FW_TYPE_MMC) {
+		fw_enable = ZYNQ_CONFIG_FW_UPDATE_MMC;
+	} else if (fw_type == ZYNQ_FW_TYPE_QSPI) {
+		fw_enable = ZYNQ_CONFIG_FW_UPDATE_QSPI;
+	} else if (fw_type == ZYNQ_FW_TYPE_SPI) {
+		fw_enable = ZYNQ_CONFIG_FW_UPDATE_SPI;
 	} else {
 		return -EINVAL;
 	}
@@ -132,7 +135,7 @@ static int zynq_fw_update(zynq_dev_t *zdev, int fw_type)
 	/* wait for updating response from ARM OS */
 	while (!(zynq_g_reg_read(zdev, ZYNQ_G_PS_INTR_STATUS) &
 	    ZYNQ_PS_INTR_FWUPDATE_DONE)) {
-		if (j++ > ZYNQ_PS_WAIT_FWUPDATE_RETRIES) {
+		if (j++ > time_to_wait * 5 * 2) {
 			zynq_err("%d %s failed: wait for image updating "
 			    "timeout\n", zdev->zdev_inst, __FUNCTION__);
 			return -EBUSY;
@@ -287,14 +290,19 @@ static long zynq_fw_ioctl(struct file *filp,
 
 		break;
 	}
-	case ZYNQ_IOC_FW_PL_UPDATE:
-		sprintf(ioc_name, "ZYNQ_IOC_FW_PL_UPDATE");
-		err = zynq_fw_update(zdev, ZYNQ_FW_TYPE_PL);
+	case ZYNQ_IOC_FW_QSPI_UPDATE:
+		sprintf(ioc_name, "ZYNQ_IOC_FW_QSPI_UPDATE");
+		err = zynq_fw_update(zdev, ZYNQ_FW_TYPE_QSPI, arg);
 		break;
 
-	case ZYNQ_IOC_FW_PS_UPDATE:
-		sprintf(ioc_name, "ZYNQ_IOC_FW_PS_UPDATE");
-		err = zynq_fw_update(zdev, ZYNQ_FW_TYPE_PS);
+	case ZYNQ_IOC_FW_MMC_UPDATE:
+		sprintf(ioc_name, "ZYNQ_IOC_FW_MMC_UPDATE");
+		err = zynq_fw_update(zdev, ZYNQ_FW_TYPE_MMC, arg);
+		break;
+
+	case ZYNQ_IOC_FW_SPI_UPDATE:
+		sprintf(ioc_name, "ZYNQ_IOC_FW_SPI_UPDATE");
+		err = zynq_fw_update(zdev, ZYNQ_FW_TYPE_SPI, arg);
 		break;
 
 	case ZYNQ_IOC_FW_GET_VER:

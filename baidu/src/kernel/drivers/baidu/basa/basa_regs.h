@@ -25,13 +25,20 @@
 #define	PCI_DEVICE_ID_MOONROVER		0x2083
 
 #define	ZYNQ_DRV_NAME			"basa"
-#define	ZYNQ_MOD_VER			"3.0.0.2"
+#define	ZYNQ_MOD_VER			"3.0.0.3"
 
 /*
  * The system clock accuracy is within 30 ppm.
  * That is, the system time can drift up to 30 microseconds per second.
  */
 #define	ZYNQ_SYS_TIME_DRIFT		30
+
+#define	ZYNQ_GPS_SYNC_TIME_MAX	(100*24*3600)	/* 100 days */
+#define	ZYNQ_GPS_SYNC_TIME_SMOOTH	1	/* 1 second */
+#define	ZYNQ_GPS_SYNC_TIME_DEFAULT	10	/* 10 seconds */
+#define	ZYNQ_GPS_SMOOTH_STEP_DEFAULT	1000	/* 1 ms */
+#define	ZYNQ_GPS_SMOOTH_STEP_MIN	16	/* 16 us */
+#define	ZYNQ_GPS_SMOOTH_STEP_MAX	500000	/* 500 ms */
 
 /*
  * Maximum number of device nodes created.
@@ -78,8 +85,9 @@
 #define	ZYNQ_CONFIG_FW_UPLOAD		(1 << 0)
 #define	ZYNQ_CONFIG_FW_UPLOAD_MAGIC	0x00000BCD
 /* FLASH update: bit2:1, 00 and 11 are invalid values */
-#define	ZYNQ_CONFIG_FW_UPDATE_PL	(1 << 1)
-#define	ZYNQ_CONFIG_FW_UPDATE_PS	(1 << 2)
+#define	ZYNQ_CONFIG_FW_UPDATE_QSPI	(1 << 1)
+#define	ZYNQ_CONFIG_FW_UPDATE_MMC	(1 << 2)
+#define	ZYNQ_CONFIG_FW_UPDATE_SPI	(1 << 3)
 #define	ZYNQ_CONFIG_GPS_ERR_EN		(1 << 12)
 #define	ZYNQ_CONFIG_TRIGGER_ONE		(1 << 16)
 #define	ZYNQ_CONFIG_GPS_SW		(1 << 17)
@@ -166,6 +174,7 @@
 #define	ZYNQ_CH_RX_PDT_SZ		0x1048
 #define	ZYNQ_CH_RX_TAIL			0x1050
 #define	ZYNQ_CH_RX_HEAD			0x1054
+#define	ZYNQ_CH_RX_BUF_FULL		(1 << 0)
 
 #define	ZYNQ_CH_WR_TABLE_CONFIG		0x104C
 #define	ZYNQ_CH_WR_LAST_PT_SZ_MASK	0xFFF
@@ -200,14 +209,13 @@
 #define	ZYNQ_CH_ERR_CAM_TRIGGER		(1 << 13)
 #define	ZYNQ_CH_ERR_CAM_LINK_CHANGE	(1 << 14)
 #define	ZYNQ_CH_ERR_DMA_RX_BUF_FULL	(1 << 24)
-#define	ZYNQ_CH_ERR_CAM_FPD_UNLOCK	(1 << 26) /* Same as CAM_STATUS[0] */
-#define	ZYNQ_CH_ERR_CAM_FIFO_FULL	(1 << 27) /* Same as CAM_STATUS[7] */
+#define	ZYNQ_CH_ERR_DMA_RX_FIFO_FULL	(1 << 25)
 
 #define	ZYNQ_CH_ERR_MASK_TX		0x1088
-#define	ZYNQ_CH_ERR_MASK_TX_DEFUALT	0x010021EC
+#define	ZYNQ_CH_ERR_MASK_TX_DEFAULT	0xFF0001EC
 
 #define	ZYNQ_CH_ERR_MASK_RX		0x108C
-#define	ZYNQ_CH_ERR_MASK_RX_DEFAULT	0x010030B0
+#define	ZYNQ_CH_ERR_MASK_RX_DEFAULT	0xFE0010B0
 
 /*
  * Device global config and status regsters:
@@ -221,8 +229,6 @@
 
 /* Needs to read LO first, then HI and Day */
 #define	ZYNQ_G_NTP_LO			0x2040
-#define	ZYNQ_NTP_LO_VALID		(1 << 0)
-
 #define	ZYNQ_G_NTP_HI			0x2044
 #define	ZYNQ_G_NTP_DATE			0x2048
 
@@ -257,6 +263,7 @@
 #define	ZYNQ_GPS_ADJ_STEP_MASK		0xFFFF
 #define	ZYNQ_GPS_MAX_TOLERANCE_OFFSET	16
 #define	ZYNQ_GPS_MAX_TOLERANCE_MASK	0xFFF
+#define	ZYNQ_GPS_LOOPBACK_EN		(1 << 28)
 #define	ZYNQ_GPS_DISABLE_SMOOTH		(1 << 30)
 #define	ZYNQ_GPS_USE_LOCAL_ONLY		(1 << 31)
 
@@ -277,17 +284,23 @@
 #define	ZYNQ_GPS_TIME_HOUR_OFFSET	16
 #define	ZYNQ_GPS_TIME_HOUR_MASK		0xFF
 
-#define	ZYNQ_G_GPS_TIME_DATE_INIT	0x210C
+#define	ZYNQ_G_GPS_CONFIG_2		0x210C
 #define	ZYNQ_GPS_TIME_YEAR_OFFSET	0
 #define	ZYNQ_GPS_TIME_YEAR_MASK		0xFF
 #define	ZYNQ_GPS_TIME_MON_OFFSET	8
 #define	ZYNQ_GPS_TIME_MON_MASK		0xFF
 #define	ZYNQ_GPS_TIME_DAY_OFFSET	16
 #define	ZYNQ_GPS_TIME_DAY_MASK		0xFF
+#define	ZYNQ_GPS_CHECKSUM_CHECK		(1 << 31)
 
 #define	ZYNQ_G_GPS_STATUS		0x2110
+#define	ZYNQ_GPS_INIT_SET		(1 << 29)
 #define	ZYNQ_GPS_SMOOTH_IN_PROGRESS	(1 << 30)
 #define	ZYNQ_GPS_LOCAL_SYNC_DONE	(1 << 31)
+
+#define	ZYNQ_G_GPS_LAST_TIME_LO		0x2118
+#define	ZYNQ_G_GPS_LAST_TIME_HI		0x211C
+#define	ZYNQ_G_GPS_LAST_TIME_DATE	0x2120
 
 /*
  * Camera Per Channel Registers:

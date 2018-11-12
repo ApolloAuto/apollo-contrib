@@ -122,7 +122,7 @@ enum ZYNQ_IOC_TRIGGER_EXT_CMD {
 };
 
 enum ZYNQ_IOC_CAM_CMD {
-	IOC_CAM_REG_READ = IOC_TRIGGER_EXT_MAX,
+	IOC_CAM_REG_READ = 100,
 	IOC_CAM_REG_WRITE,
 	IOC_CAM_FLASH_INIT,
 	IOC_CAM_FLASH_FINI,
@@ -130,6 +130,21 @@ enum ZYNQ_IOC_CAM_CMD {
 	IOC_CAM_FLASH_WRITE,
 	IOC_CAM_CAPS,
 	IOC_CAM_RESET
+};
+
+enum ZYNQ_IOC_GPS_EXT_CMD {
+	IOC_GPS_FPGA_INIT = 110,
+	IOC_GPS_SYNC
+};
+
+enum ZYNQ_IOC_FW_EXT_CMD {
+	IOC_FW_QSPI_UPDATE = 120, /* QSPI flash image update */
+	IOC_FW_MMC_UPDATE,	/* eMMC image update */
+	IOC_FW_SPI_UPDATE	/* SPI flash image update */
+};
+
+enum ZYNQ_IOC_MISC_CMD {
+	IOC_STATS_GET = 200
 };
 
 enum zynq_baudrate_val {
@@ -140,13 +155,21 @@ enum zynq_baudrate_val {
 	ZYNQ_BAUDRATE_NUM
 };
 
+/* Misc ioctl cmds */
+#define	ZYNQ_IOC_STATS_GET \
+		_IOWR(ZYNQ_IOC_MAGIC, IOC_STATS_GET, unsigned long)
+
 /* GPS update ioctl cmds */
 #define	ZYNQ_GPS_VAL_SZ			12
 #define	ZYNQ_IOC_GPS_GET		\
-		_IOR(ZYNQ_IOC_MAGIC, IOC_GPS_GET,  unsigned char *)
-#define ZYNQ_GPS_GPRMC_VAL_SZ		68
+		_IOR(ZYNQ_IOC_MAGIC, IOC_GPS_GET, unsigned char *)
+#define	ZYNQ_GPS_GPRMC_VAL_SZ		68
 #define	ZYNQ_IOC_GPS_GPRMC_GET		\
 		_IOR(ZYNQ_IOC_MAGIC, IOC_GPS_GPRMC_GET, unsigned char *)
+#define	ZYNQ_IOC_GPS_FPGA_INIT		\
+		_IO(ZYNQ_IOC_MAGIC, IOC_GPS_FPGA_INIT)
+#define	ZYNQ_IOC_GPS_SYNC		\
+		_IO(ZYNQ_IOC_MAGIC, IOC_GPS_SYNC)
 
 /* Trigger ioctl cmds */
 #define	ZYNQ_IOC_TRIGGER_DISABLE	\
@@ -214,18 +237,6 @@ typedef struct zynq_cam_fw {
 } zynq_cam_fw_t;
 
 #define	ZYNQ_TRIGGER_DEV_NUM	4
-
-/* supported Leopard Imaging fps */
-#define	LI_FPS_30_DEFAULT	0	/* 30Hz */
-#define	LI_FPS_20		1	/* 20Hz */
-#define	LI_FPS_15		2	/* 15Hz */
-#define	LI_FPS_10		3	/* 10Hz */
-/* adv_trigger specify fps in format of <GH><LI><BB><LD> */
-#define	ZYNQ_FPS_LI(fps)	((fps >> 8) & 0xf)
-#define	ZYNQ_FPS_KEEP		0xf
-#define	ZYNQ_FPS_KEEP_ALL	0xffff
-#define	ZYNQ_FPS_ALL_DEFAULT	0
-#define	ZYNQ_FPS_LI_DEFAULT	0xf0ff
 
 #define	ZYNQ_USB_FPS_MAX	30
 #define	ZYNQ_USB_FPS_DEFAULT	30
@@ -302,6 +313,12 @@ typedef struct ioc_zynq_fw_upload {
 		_IOW(ZYNQ_IOC_MAGIC, IOC_FW_PS_UPDATE, unsigned long)
 #define	ZYNQ_IOC_FW_GET_VER		\
 		_IOW(ZYNQ_IOC_MAGIC, IOC_FW_GET_VER, unsigned int *)
+#define	ZYNQ_IOC_FW_QSPI_UPDATE		\
+		_IOW(ZYNQ_IOC_MAGIC, IOC_FW_QSPI_UPDATE, unsigned long)
+#define	ZYNQ_IOC_FW_MMC_UPDATE		\
+		_IOW(ZYNQ_IOC_MAGIC, IOC_FW_MMC_UPDATE, unsigned long)
+#define	ZYNQ_IOC_FW_SPI_UPDATE		\
+		_IOW(ZYNQ_IOC_MAGIC, IOC_FW_SPI_UPDATE, unsigned long)
 
 /* CAN channel ioctl cmds */
 #define	ZYNQ_IOC_CAN_TX_TIMEOUT_SET	\
@@ -388,32 +405,41 @@ typedef struct zynq_cam_acc {
 #define	ZYNQ_IOC_REG_GPSPPS_EVENT_WAIT	\
 		_IOW(ZYNQ_IOC_MAGIC, IOC_REG_GPSPPS_EVENT_WAIT, unsigned long)
 
+#define	ZVIDEO_EXT_MARKER		0xFE12
 #define	ZVIDEO_EXT_ERR_FRAME_FORMAT	0x01
 #define	ZVIDEO_EXT_ERR_SHORT_FRAME	0x02
 #define	ZVIDEO_EXT_ERR_LONG_FRAME	0x04
 #define	ZVIDEO_EXT_ERR_ALL		0x07
 #define	ZVIDEO_EXT_ERR_INVALID		0xFF
 #define	ZVIDEO_FRAME_CORRUPTED(ext)	\
-	((*(unsigned int *)ext->rsv1) ||	\
-	(*(unsigned int *)&ext->rsv2[6]) ||	\
-	(*(unsigned int *)&ext->rsv2[9]) ||	\
+	((ext->marker[0] != ZVIDEO_EXT_MARKER) || \
+	(ext->marker[1] != ZVIDEO_EXT_MARKER) || \
+	(ext->marker[2] != ZVIDEO_EXT_MARKER) || \
+	(*(unsigned int *)ext->rsv1) || \
+	(*(unsigned int *)&ext->rsv2[0]) || \
+	(*(unsigned int *)&ext->rsv2[3]) || \
 	(ext->error & ~(unsigned char)ZVIDEO_EXT_ERR_ALL))
 
 typedef struct zynq_video_ext_meta_data {
-	unsigned int trigger_cnt;
+	unsigned int	trigger_cnt;
 	struct {
-		unsigned int usec:20;
-		unsigned int :12;
-		unsigned int sec;
+		unsigned int	usec:20;
+		unsigned int	:12;
+		unsigned int	sec;
 	} time_stamp;
-	unsigned char rsv1[4];
+	unsigned char	rsv1[4];
 	struct {
-		unsigned short us_cnt:12;
-		unsigned short sec:4;
+		unsigned short	us_cnt:12;
+		unsigned short	sec:4;
 	} debug_ts;
-	unsigned char rsv2[13];
-	unsigned char error;
+	unsigned short	marker[3];
+	unsigned char	rsv2[7];
+	unsigned char	error;
 } zynq_video_ext_meta_data_t;
+
+/* Code name */
+#define	CAM_CAP_CODENAME_ARGUS		0
+#define	CAM_CAP_CODENAME_SHARPVISION	1
 
 /* Trigger mode */
 #define	CAM_CAP_TRIGGER_STANDARD	0
@@ -467,31 +493,126 @@ typedef struct zynq_camera_capabilities {
 	unsigned int	pixel_clock;
 } zynq_cam_caps_t;
 
+enum zynq_dev_stats {
+	DEV_STATS_INTR = 0,
+	DEV_STATS_INTR_INVALID,
+	DEV_STATS_GPS_UNLOCK,
+	DEV_STATS_NUM
+};
+
+enum zynq_chan_stats {
+	CHAN_STATS_RX_INTR = 0,
+	CHAN_STATS_TX_INTR,
+	CHAN_STATS_RX_ERR_INTR,
+	CHAN_STATS_TX_ERR_INTR,
+	CHAN_STATS_RX_DROP,
+	CHAN_STATS_RX,
+	CHAN_STATS_TX,
+	CHAN_STATS_NUM
+};
+
+enum zynq_video_stats {
+	VIDEO_STATS_FRAME = 0,
+	VIDEO_STATS_RESET,
+	VIDEO_STATS_TRIG_PULSE_ERR,
+	VIDEO_STATS_LINK_CHANGE,
+	VIDEO_STATS_DMA_RX_BUF_FULL,
+	VIDEO_STATS_DMA_RX_FIFO_FULL,
+	VIDEO_STATS_TRIG_COUNT_MISMATCH,
+	VIDEO_STATS_META_COUNT_MISMATCH,
+	VIDEO_STATS_FRAME_GAP_ERR,
+	VIDEO_STATS_FRAME_FORMAT_ERR,
+	VIDEO_STATS_FRAME_SHORT,
+	VIDEO_STATS_FRAME_LONG,
+	VIDEO_STATS_FRAME_CORRUPT,
+	VIDEO_STATS_FRAME_DROP,
+	VIDEO_STATS_FRAME_DROP_1,
+	VIDEO_STATS_FRAME_DROP_2,
+	VIDEO_STATS_FRAME_DROP_M,
+	VIDEO_STATS_NO_VIDEO_BUF,
+	VIDEO_STATS_NUM
+};
+
+enum zynq_can_stats {
+	CAN_STATS_PIO_RX = 0,
+	CAN_STATS_PIO_TX,
+	CAN_STATS_PIO_TX_HI,
+	CAN_STATS_USR_RX_WAIT,
+	CAN_STATS_USR_RX_WAIT_INT,
+	CAN_STATS_USR_RX_TIMEOUT,
+	CAN_STATS_USR_RX_PARTIAL,
+	CAN_STATS_BUS_OFF,
+	CAN_STATS_STATUS_ERR,
+	CAN_STATS_RX_IP_FIFO_OVF,
+	CAN_STATS_RX_USR_FIFO_OVF,
+	CAN_STATS_TX_TIMEOUT,
+	CAN_STATS_TX_LP_FIFO_FULL,
+	CAN_STATS_RX_USR_FIFO_FULL,
+	CAN_STATS_TX_HP_FIFO_FULL,
+	CAN_STATS_CRC_ERR,
+	CAN_STATS_FRAME_ERR,
+	CAN_STATS_STUFF_ERR,
+	CAN_STATS_BIT_ERR,
+	CAN_STATS_ACK_ERR,
+	CAN_STATS_NUM
+};
+
+/* channel type definition */
+enum zynq_chan_type {
+	ZYNQ_CHAN_INVAL,
+	ZYNQ_CHAN_CAN,		/* CAN channel */
+	ZYNQ_CHAN_VIDEO,	/* Video channel */
+	ZYNQ_CHAN_TYPE_NUM
+};
+
+#define	ZYNQ_CHAN_MAX			16
+#define	ZYNQ_STATS_MAX			32
+typedef struct ioc_zynq_stats {
+	struct {
+		enum zynq_chan_type	type;
+		unsigned int		devnum;
+		unsigned long		stats[ZYNQ_STATS_MAX];
+	} chs[ZYNQ_CHAN_MAX + 1];
+} ioc_zynq_stats_t;
+
 /* Fixed embedded data header: 00 0A 00 AA 00 30 00 A5 00 00 00 5A */
 #define	EM_HDR_LEN			12
 #define	EM_HDR_DWORD0			0xAA000A00
 #define	EM_HDR_DWORD1			0xA5003000
 #define	EM_HDR_DWORD2			0x5A000000
 #define	EM_HDR_MASK			0xFFFF00FF
-#define	EM_REG_CHIP_VER			0x3000
-#define	EM_REG_FRAME_LEN_LINES		0x300A
-#define	EM_REG_LINE_LEN_PCK		0x300C
-#define	EM_REG_LOCK_CONTROL		0x3010
-#define	EM_REG_COARSE_INT		0x3012
-#define	EM_REG_FRAME_COUNT		0x303A
-#define	EM_REG_FRAME_STATUS		0x303C
-#define	EM_REG_EXTRA_DELAY		0x3042
 
-#define	EM_REG_BASE(buf)		\
-	(((*((unsigned char *)(buf) + 5)) << 8) + \
-	(*((unsigned char *)(buf) + 9)))
-#define	EM_REG_OFFSET(buf, x)		(((x) - EM_REG_BASE(buf)) << 2)
+#define	EM_REG_CHIP_VER			0x3000	/* Common */
+#define	EM_REG_FRAME_CNT_HI		0x2000	/* AR0231 only */
+#define	EM_REG_EXP_T1_ROW		0x2020	/* AR0231 only */
+
+/* AR0230, single register group from 0x3000 */
+#define	EM_REG_OFFSET_BASE_230		0x0004
+#define	EM_REG_OFFSET_FRAME_LNS_230	0x0034	/* Register 0x300A */
+#define	EM_REG_OFFSET_LINE_PCK_230	0x003C	/* Register 0x300C */
+#define	EM_REG_OFFSET_COARSE_INT_230	0x0054	/* Register 0x3012 */
+#define	EM_REG_OFFSET_FRAME_CNT_230	0x00F4	/* Register 0x303A */
+
+/* AR0231, register group 0x2000 - 0x2018 */
+#define	EM_REG_OFFSET_BASE1_231		0x0004
+#define	EM_REG_OFFSET_FRAME_CNT_HI_231	0x000C	/* Register 0x2000 */
+#define	EM_REG_OFFSET_FRAME_CNT_LO_231	0x0014	/* Register 0x2002 */
+/* AR0231, register group 0x2020 - 0x2050 */
+#define	EM_REG_OFFSET_BASE2_231		0x0074
+#define	EM_REG_OFFSET_EXP_T1_ROW_231	0x007C	/* Register 0x2020 */
+#define	EM_REG_OFFSET_EXP_T1_CLK_HI_231	0x009C	/* Register 0x2028 */
+#define	EM_REG_OFFSET_EXP_T1_CLK_LO_231	0x00A4	/* Register 0x202A */
+
 #define	EM_REG_VAL_MSB(buf, x)		\
-	(*((unsigned char *)(buf) + EM_HDR_LEN + EM_REG_OFFSET(buf, x) + 1))
+	(*((unsigned char *)(buf) + (x) + 1))
 #define	EM_REG_VAL_LSB(buf, x)		\
-	(*((unsigned char *)(buf) + EM_HDR_LEN + EM_REG_OFFSET(buf, x) + 5))
+	(*((unsigned char *)(buf) + (x) + 5))
 #define	EM_REG_VAL(buf, x)	\
 	((EM_REG_VAL_MSB(buf, x) << 8) + EM_REG_VAL_LSB(buf, x))
+#define	EM_REG_VAL_230(buf, x)		\
+	EM_REG_VAL(buf, EM_REG_OFFSET_ ## x ## _230)
+#define	EM_REG_VAL_231(buf, x)		\
+	EM_REG_VAL(buf, EM_REG_OFFSET_ ## x ## _231)
 
 #define	EM_DATA_VALID(buf)	\
 	((((unsigned int *)(buf))[0] == EM_HDR_DWORD0) && \
@@ -500,6 +621,12 @@ typedef struct zynq_camera_capabilities {
 	((((unsigned int *)(buf))[2] & EM_HDR_MASK) == \
 	(EM_HDR_DWORD2 & EM_HDR_MASK)))
 
-#define	DEFAULT_PIXCLK			79312500
+#define	DEFAULT_FRAME_LINES_230		1112
+#define	DEFAULT_LINE_PCK_230		2876
+#define	DEFAULT_PIXCLK_230		64000000
+
+#define	DEFAULT_FRAME_LINES_231		1238
+#define	DEFAULT_LINE_PCK_231		2580
+#define	DEFAULT_PIXCLK_231		64000000
 
 #endif	/* _ZYNQ_API_H_ */

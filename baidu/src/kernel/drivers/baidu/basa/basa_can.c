@@ -38,12 +38,14 @@
 
 static void zcan_pio_rx_proc(zynq_can_t *zcan);
 
+/* CAN Rx buffer number */
+static unsigned int zynq_can_rx_buf_num = ZCAN_IP_MSG_NUM;
 /* CAN bus sampling point */
 static unsigned int zynq_can_ip_btr = ZCAN_IP_BTR_DEFAULT;
 /* disabling CAN Rx H/W timestamp */
 static unsigned int zynq_disable_can_hw_ts = 0;
 /* enabling CAN Rx DMA mode */
-unsigned int zynq_enable_can_rx_dma = 0;
+unsigned int zynq_enable_can_rx_dma = 1;
 /* enabling CAN Tx DMA mode */
 unsigned int zynq_enable_can_tx_dma = 0;
 
@@ -218,9 +220,7 @@ void zynq_dbg_reg_dump_all(zynq_dev_t *zdev)
  */
 void zcan_err_proc(zynq_can_t *zcan, int ch_err_status)
 {
-	zynq_chan_t *zchan = zcan->zchan;
-
-	if (zynq_trace_param || zynq_dbg_reg_dump_param) {
+	if ((zynq_trace_param & ZYNQ_TRACE_CAN) || zynq_dbg_reg_dump_param) {
 		zcan_pio_dbg_reg_dump_ch(zcan);
 	}
 
@@ -245,10 +245,6 @@ void zcan_err_proc(zynq_can_t *zcan, int ch_err_status)
 	}
 	if (ch_err_status & ZYNQ_CH_ERR_CAN_RX_FIFOFULL) {
 		ZYNQ_STATS_LOG(zcan, CAN_STATS_RX_USR_FIFO_FULL);
-		/* mask this error */
-		zchan_reg_write(zchan, ZYNQ_CH_ERR_MASK_RX,
-		    ZYNQ_CH_ERR_CAN_RX_FIFOFULL |
-		    zchan_reg_read(zchan, ZYNQ_CH_ERR_MASK_RX));
 	}
 	if (ch_err_status & ZYNQ_CH_ERR_CAN_TX_HPFIFOFULL) {
 		ZYNQ_STATS_LOG(zcan, CAN_STATS_TX_HP_FIFO_FULL);
@@ -858,8 +854,8 @@ retry:
 					goto retry;
 				} else {
 					ret = BCAN_TIMEOUT;
-					if (zynq_trace_param ||
-					    zynq_dbg_reg_dump_param) {
+					if ((zynq_trace_param & ZYNQ_TRACE_CAN)
+					    || zynq_dbg_reg_dump_param) {
 						zcan_pio_dbg_reg_dump_ch(zcan);
 					}
 				}
@@ -949,14 +945,14 @@ static int zcan_pio_rx(zynq_can_t *zcan, char *buf, int buf_sz, int wait)
 #endif
 
 /* check if we have received enough data as requested */
-static inline int zcan_usr_rx_enough(zynq_can_t *zcan)
+static inline void zcan_usr_rx_complete(zynq_can_t *zcan)
 {
 	u32 req_num, rx_num;
 
 	spin_lock(&zcan->zcan_pio_rx_lock);
 	if (zcan->zcan_usr_buf == NULL) {
 		spin_unlock(&zcan->zcan_pio_rx_lock);
-		return 0;
+		return;
 	}
 	/* requested Rx number */
 	req_num = zcan->zcan_usr_buf_num - zcan->zcan_usr_rx_num;
@@ -972,14 +968,12 @@ static inline int zcan_usr_rx_enough(zynq_can_t *zcan)
 	zcan->zcan_pio_rx_last_chk_tail = zcan->zcan_buf_rx_tail;
 	zcan->zcan_pio_rx_last_chk_cnt = rx_num;
 	zcan->zcan_pio_rx_last_chk_seq = zcan->zcan_usr_rx_seq;
-	spin_unlock(&zcan->zcan_pio_rx_lock);
 
 	/* received enough */
-	if (rx_num >= req_num) {
-		return 1;
+	if ((rx_num > 0) && (rx_num >= req_num)) {
+		complete(&zcan->zcan_usr_rx_comp);
 	}
-
-	return 0;
+	spin_unlock(&zcan->zcan_pio_rx_lock);
 }
 
 /* copy the received CAN message(s) to usrland buffer */
@@ -989,7 +983,7 @@ static int zcan_copy_to_user(zynq_can_t *zcan)
 	bcan_msg_t *buf;
 	bcan_msg_t *bmsg;
 	zcan_msg_t *cmsg;
-	int head, head_mask;
+	int head;
 
 	zynq_trace(ZYNQ_TRACE_CAN_MSG, "%d can%d ch%d %s enter: buf_num=%d\n",
 	    ZYNQ_INST(zchan), zcan->zcan_ip_num, zchan->zchan_num, __FUNCTION__,
@@ -1006,9 +1000,8 @@ static int zcan_copy_to_user(zynq_can_t *zcan)
 	}
 
 	/* get buffered CAN messages to user */
-	head_mask = zcan->zcan_buf_rx_num - 1;
 	for (head = zcan->zcan_buf_rx_head; head != zcan->zcan_buf_rx_tail;
-	    head++, head &= head_mask) {
+	    head++, head %= zcan->zcan_buf_rx_num) {
 		if (zcan->zcan_usr_rx_num == zcan->zcan_usr_buf_num) {
 			break;
 		}
@@ -1121,11 +1114,12 @@ static int zcan_rx_user(zynq_can_t *zcan, ioc_bcan_msg_t *ioc_arg,
 	if (ret == BCAN_OK) {
 		goto done; /* received enough */
 	}
+
+	reinit_completion(&zcan->zcan_usr_rx_comp);
 	spin_unlock_bh(&zcan->zcan_pio_rx_lock);
 
 	/* wait for more data */
 	ZYNQ_STATS(zcan, CAN_STATS_USR_RX_WAIT);
-	reinit_completion(&zcan->zcan_usr_rx_comp);
 	timeout = wait_for_completion_interruptible_timeout(
 	    &zcan->zcan_usr_rx_comp,
 	    msecs_to_jiffies(zcan->zcan_rx_timeout));
@@ -1194,11 +1188,14 @@ static inline void zcan_buf_inc_rx_head(zynq_can_t *zcan, int inc)
 
 	spin_lock(&zcan->zcan_pio_rx_lock);
 	head = (zcan->zcan_buf_rx_head + inc) % zcan->zcan_buf_rx_num;
-	zynq_err("%d can%d ch%d %s: head=%d, inc=%d, new_head=%d, tail=%d\n",
+	zynq_trace(ZYNQ_TRACE_CAN,
+	    "%d can%d ch%d %s: head=%d, inc=%d, new_head=%d, tail=%d\n",
 	    ZYNQ_INST(zchan), zcan->zcan_ip_num, zchan->zchan_num, __FUNCTION__,
 	    zcan->zcan_buf_rx_head, inc, head, zcan->zcan_buf_rx_tail);
 	zcan->zcan_buf_rx_head = head;
 	spin_unlock(&zcan->zcan_pio_rx_lock);
+
+	ZYNQ_STATS_LOGX(zchan, CHAN_STATS_RX_DROP, inc, 0);
 }
 
 static inline int zcan_buf_rx_full(zynq_can_t *zcan)
@@ -1278,14 +1275,12 @@ static int zcan_pio_rx_poll(void *arg)
 
 			/* NEXT tail */
 			rx_tail++;
-			rx_tail &= zcan->zcan_buf_rx_num - 1;
+			rx_tail %= zcan->zcan_buf_rx_num;
 			zcan->zcan_buf_rx_tail = rx_tail;
 			ZYNQ_STATS(zcan, CAN_STATS_PIO_RX);
 
 			/* notify the receiver */
-			if (zcan_usr_rx_enough(zcan)) {
-				complete(&zcan->zcan_usr_rx_comp);
-			}
+			zcan_usr_rx_complete(zcan);
 
 			if (kthread_should_stop()) {
 				break;
@@ -1361,9 +1356,7 @@ static void zcan_pio_rx_proc(zynq_can_t *zcan)
 		ZYNQ_STATS(zcan, CAN_STATS_PIO_RX);
 
 		/* notify the receiver */
-		if (zcan_usr_rx_enough(zcan)) {
-			complete(&zcan->zcan_usr_rx_comp);
-		}
+		zcan_usr_rx_complete(zcan);
 	}
 }
 
@@ -1451,9 +1444,7 @@ static void zcan_dma_rx_proc(zynq_can_t *zcan)
 		ZYNQ_STATS(zchan, CHAN_STATS_RX);
 
 		/* notify the receiver */
-		if (zcan_usr_rx_enough(zcan)) {
-			complete(&zcan->zcan_usr_rx_comp);
-		}
+		zcan_usr_rx_complete(zcan);
 	}
 	/* update h/w head index */
 	zchan_reg_write(zchan, ZYNQ_CH_RX_HEAD, rx_off);
@@ -1893,15 +1884,21 @@ int zcan_pio_init(zynq_can_t *zcan, enum zcan_ip_mode mode)
 		return -1;
 	}
 
+	if (zynq_can_rx_buf_num < ZCAN_IP_MSG_MIN) {
+		zynq_can_rx_buf_num = ZCAN_IP_MSG_MIN;
+	} else if (zynq_can_rx_buf_num > ZCAN_IP_MSG_MAX) {
+		zynq_can_rx_buf_num = ZCAN_IP_MSG_MAX;
+	}
+
 	/* allocate Rx buffer ring */
-	zcan->zcan_buf_rx_msg = kzalloc(ZCAN_IP_MSG_NUM * sizeof(bcan_msg_t),
+	zcan->zcan_buf_rx_msg = kzalloc(zynq_can_rx_buf_num * sizeof(bcan_msg_t),
 	    GFP_KERNEL);
 	if (zcan->zcan_buf_rx_msg == NULL) {
 		zynq_destroy_cdev(zcan->zcan_pio_dev, &zcan->zcan_pio_cdev);
 		zynq_err("%s: failed to alloc cmsg array.\n", __FUNCTION__);
 		return -1;
 	}
-	zcan->zcan_buf_rx_num = ZCAN_IP_MSG_NUM;
+	zcan->zcan_buf_rx_num = zynq_can_rx_buf_num;
 	zcan->zcan_pio_baudrate = ZYNQ_BAUDRATE_500K;
 	spin_lock_init(&zcan->zcan_pio_lock);
 	spin_lock_init(&zcan->zcan_pio_tx_lock);
@@ -2020,6 +2017,8 @@ zynq_can_t *can_ip_to_zcan(zynq_dev_t *zdev, u32 can_ip_num)
 module_param_named(canbtr, zynq_can_ip_btr, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(canbtr, "CAN bus sampling point");
 #endif
+module_param_named(canrxbuf, zynq_can_rx_buf_num, uint, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(canrxbuf, "CAN Rx buffer number");
 module_param_named(nocanhwts, zynq_disable_can_hw_ts, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(nocanhwts, "disable CAN Rx H/W timestamp");
 module_param_named(canrxdma, zynq_enable_can_rx_dma, uint, S_IRUGO|S_IWUSR);

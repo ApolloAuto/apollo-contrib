@@ -17,7 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/module.h>
 #include <linux/delay.h>
+#include <linux/kthread.h>
 
 #include "basa.h"
 
@@ -678,12 +680,11 @@ void zchan_rx_start(zynq_chan_t *zchan)
 	u32 ch_config;
 	u32 ch_status;
 	u32 last_pt_sz;
-	int i;
+	u32 timeout;
+	u32 i;
 
 	zynq_trace(ZYNQ_TRACE_CHAN, "%d ch %d %s: zchan=0x%p\n",
 	    ZYNQ_INST(zchan), zchan->zchan_num, __FUNCTION__, zchan);
-
-	spin_lock(&zdev->zdev_lock);
 
 	/* Reset DMA first */
 	zchan_reset(zchan);
@@ -716,7 +717,6 @@ void zchan_rx_start(zynq_chan_t *zchan)
 		zchan_reg_write(zchan, ZYNQ_CH_WR_TABLE_CONFIG, last_pt_sz);
 		break;
 	default:
-		spin_unlock(&zdev->zdev_lock);
 		return;
 	}
 
@@ -737,20 +737,22 @@ void zchan_rx_start(zynq_chan_t *zchan)
 	zchan_reg_write(zchan, ZYNQ_CH_DMA_CONTROL, ZYNQ_CH_DMA_WR_START);
 
 	/* Check DMA ready status */
-	i = 0;
-	ch_status = zchan_reg_read(zchan, ZYNQ_CH_DMA_STATUS);
-	while (GET_BITS(ZYNQ_CH_DMA_WR_STATE, ch_status) !=
-	    ZYNQ_CH_DMA_READY) {
-		if (i++ >= 10) {
-			zynq_err("%d ch %d %s: WARNING! DMA not ready\n",
-			    ZYNQ_INST(zchan), zchan->zchan_num, __FUNCTION__);
-			break;
-		}
+	timeout = zchan_rx->zchan_rx_pdt_num * 10;	/* msec */
+	for (i = 0; i < timeout; i++) {
 		mdelay(1);
 		ch_status = zchan_reg_read(zchan, ZYNQ_CH_DMA_STATUS);
+		if (GET_BITS(ZYNQ_CH_DMA_WR_STATE, ch_status) ==
+		    ZYNQ_CH_DMA_READY) {
+			zynq_trace(ZYNQ_TRACE_CHAN,
+			    "%d ch %d %s: DMA ready, wait %ums\n",
+			    ZYNQ_INST(zchan), zchan->zchan_num,
+			    __FUNCTION__, i);
+			return;
+		}
 	}
 
-	spin_unlock(&zdev->zdev_lock);
+	zynq_err("%d ch %d %s: WARNING! DMA not ready, timeout %ums\n",
+	    ZYNQ_INST(zchan), zchan->zchan_num, __FUNCTION__, timeout);
 }
 
 void zchan_rx_stop(zynq_chan_t *zchan)
@@ -842,6 +844,138 @@ static void zchan_stats_init(zynq_chan_t *zchan)
 	}
 }
 
+void zchan_watchdog_complete(zynq_chan_t *zchan)
+{
+	complete(&zchan->watchdog_completion);
+}
+
+void zchan_err_mask(zynq_chan_t *zchan, uint32_t ch_err)
+{
+	uint32_t mask_rx;
+	uint32_t mask_tx;
+	uint32_t i;
+
+	/* Camera link change is never masked */
+	ch_err &= ~ZYNQ_CH_ERR_CAM_LINK_CHANGE;
+	if (ch_err == 0) {
+		return;
+	}
+
+	spin_lock(&zchan->zchan_lock);
+	for (i = 0; i < 32; i++) {
+		if ((ch_err & (1 << i)) && (zchan->ts_err[i] == 0)) {
+			zchan->ts_err[i] = jiffies;
+		}
+	}
+
+	mask_rx = zchan_reg_read(zchan, ZYNQ_CH_ERR_MASK_RX);
+	mask_tx = zchan_reg_read(zchan, ZYNQ_CH_ERR_MASK_TX);
+	zynq_trace(ZYNQ_TRACE_CHAN, "%d ch %d %s: "
+	    "ch_err_mask_rx=0x%x, ch_err_mask_tx=0x%x, ch_err=0x%x\n",
+	    ZYNQ_INST(zchan), zchan->zchan_num, __FUNCTION__,
+	    mask_rx, mask_tx, ch_err);
+	mask_rx |= ch_err | ZYNQ_CH_ERR_MASK_RX_DEFAULT;
+	mask_tx |= ch_err | ZYNQ_CH_ERR_MASK_TX_DEFAULT;
+	zchan_reg_write(zchan, ZYNQ_CH_ERR_MASK_RX, mask_rx);
+	zchan_reg_write(zchan, ZYNQ_CH_ERR_MASK_TX, mask_tx);
+	zynq_trace(ZYNQ_TRACE_CHAN, "%d ch %d %s: "
+	    "ch_err_mask_rx=0x%x, ch_err_mask_tx=0x%x\n",
+	    ZYNQ_INST(zchan), zchan->zchan_num, __FUNCTION__,
+	    mask_rx, mask_tx);
+	zchan->watchdog_interval = 100;
+	spin_unlock(&zchan->zchan_lock);
+
+	zchan_watchdog_complete(zchan);
+}
+
+static void zchan_err_unmask(zynq_chan_t *zchan)
+{
+	uint32_t ch_err = 0;
+	uint32_t mask_rx;
+	uint32_t mask_tx;
+	uint32_t i;
+
+	spin_lock(&zchan->zchan_lock);
+	for (i = 0; i < 32; i++) {
+		if ((zchan->ts_err[i] != 0) && (jiffies >=
+		    (zchan->ts_err[i] + msecs_to_jiffies(ZCHAN_ERR_THROTTLE)))) {
+			zchan->ts_err[i] = 0;
+			ch_err |= 1 << i;
+		}
+	}
+
+	if (ch_err == 0) {
+		spin_unlock(&zchan->zchan_lock);
+		return;
+	}
+
+	mask_rx = zchan_reg_read(zchan, ZYNQ_CH_ERR_MASK_RX);
+	mask_tx = zchan_reg_read(zchan, ZYNQ_CH_ERR_MASK_TX);
+	zynq_trace(ZYNQ_TRACE_CHAN, "%d ch %d %s: "
+	    "ch_err_mask_rx=0x%x, ch_err_mask_tx=0x%x, ch_err=0x%x\n",
+	    ZYNQ_INST(zchan), zchan->zchan_num, __FUNCTION__,
+	    mask_rx, mask_tx, ch_err);
+	mask_rx &= ~ch_err;
+	mask_rx |= ZYNQ_CH_ERR_MASK_RX_DEFAULT;
+	mask_tx &= ~ch_err;
+	mask_tx |= ZYNQ_CH_ERR_MASK_TX_DEFAULT;
+	zchan_reg_write(zchan, ZYNQ_CH_ERR_MASK_RX, mask_rx);
+	zchan_reg_write(zchan, ZYNQ_CH_ERR_MASK_TX, mask_tx);
+	zynq_trace(ZYNQ_TRACE_CHAN, "%d ch %d %s: "
+	    "ch_err_mask_rx=0x%x, ch_err_mask_tx=0x%x\n",
+	    ZYNQ_INST(zchan), zchan->zchan_num, __FUNCTION__,
+	    mask_rx, mask_tx);
+	if ((mask_rx == ZYNQ_CH_ERR_MASK_RX_DEFAULT) &&
+	    (mask_tx == ZYNQ_CH_ERR_MASK_TX_DEFAULT)) {
+		zchan->watchdog_interval = 1000;
+	}
+	spin_unlock(&zchan->zchan_lock);
+}
+
+static int zchan_watchdog(void *arg)
+{
+	zynq_chan_t *zchan = (zynq_chan_t *)arg;
+	long result;
+
+	while (!kthread_should_stop()) {
+		result = wait_for_completion_interruptible_timeout(
+		    &zchan->watchdog_completion,
+		    msecs_to_jiffies(zchan->watchdog_interval));
+		if (result < 0) {
+			break;
+		}
+
+		zchan_err_unmask(zchan);
+
+		if (zchan->zchan_type == ZYNQ_CHAN_VIDEO) {
+			zvideo_watchdog((zynq_video_t *)zchan->zchan_dev);
+		}
+
+		if (result > 0) {
+			reinit_completion(&zchan->watchdog_completion);
+		}
+	}
+
+	return 0;
+}
+
+static void zchan_watchdog_init(zynq_chan_t *zchan)
+{
+	init_completion(&zchan->watchdog_completion);
+	zchan->watchdog_interval = 1000;
+	zchan->watchdog_taskp = kthread_run(zchan_watchdog,
+	    zchan, "zynq channel watchdog thread");
+}
+
+static void zchan_watchdog_fini(zynq_chan_t *zchan)
+{
+	complete(&zchan->watchdog_completion);
+	if (zchan->watchdog_taskp) {
+		kthread_stop(zchan->watchdog_taskp);
+		zchan->watchdog_taskp = NULL;
+	}
+}
+
 int zchan_init(zynq_chan_t *zchan)
 {
 	zynq_can_t *zcan;
@@ -867,6 +1001,7 @@ int zchan_init(zynq_chan_t *zchan)
 			zchan_fini_dma(zchan);
 			return -1;
 		}
+		zchan_watchdog_init(zchan);
 		break;
 	case ZYNQ_CHAN_VIDEO:
 		zvideo = (zynq_video_t *)zchan->zchan_dev;
@@ -878,6 +1013,7 @@ int zchan_init(zynq_chan_t *zchan)
 			zvideo_fini(zvideo);
 			return -1;
 		}
+		zchan_watchdog_init(zchan);
 		break;
 	default:
 		break;
@@ -892,10 +1028,12 @@ void zchan_fini(zynq_chan_t *zchan)
 {
 	switch (zchan->zchan_type) {
 	case ZYNQ_CHAN_CAN:
+		zchan_watchdog_fini(zchan);
 		zcan_fini(zchan->zchan_dev);
 		zchan_fini_dma(zchan);
 		break;
 	case ZYNQ_CHAN_VIDEO:
+		zchan_watchdog_fini(zchan);
 		zvideo_fini(zchan->zchan_dev);
 		zchan_fini_dma(zchan);
 		break;
