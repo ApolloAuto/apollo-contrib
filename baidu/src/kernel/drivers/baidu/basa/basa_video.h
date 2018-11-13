@@ -50,36 +50,17 @@
 
 #define	T_ROW(llp, pck)			\
 	div_u64((u64)(llp) * USEC_PER_SEC, (pck))
-#define	T_COARSE_INT(cit, llp, pck)	\
-	mul_u64_u32_div((u64)(llp) * USEC_PER_SEC, (cit), (pck))
+#define	T_FRAME(fll, llp, pck)	\
+	mul_u64_u32_div((u64)(llp) * USEC_PER_SEC, (fll), (pck))
 
 #define	ZVIDEO_STATE_STREAMING		0x01
-#define	ZVIDEO_STATE_LINK_CHANGE	0x40
-#define	ZVIDEO_STATE_FAULT		0x80
+#define	ZVIDEO_STATE_LINK_CHANGE	0x10
+#define	ZVIDEO_STATE_CAM_FAULT		0x40
+#define	ZVIDEO_STATE_CHAN_FAULT		0x80
 
 #define	ZVIDEO_LINK_CHANGE_DELAY	1000	/* msec */
 
 struct zynq_dev;
-
-enum zynq_video_stats {
-	VIDEO_STATS_FRAME = 0,
-	VIDEO_STATS_RESET,
-	VIDEO_STATS_TRIG_PULSE_ERR,
-	VIDEO_STATS_LINK_CHANGE,
-	VIDEO_STATS_DMA_RX_BUF_FULL,
-	VIDEO_STATS_FPD_LINK_UNLOCK,
-	VIDEO_STATS_FIFO_FULL,
-	VIDEO_STATS_TRIG_COUNT_MISMATCH,
-	VIDEO_STATS_META_COUNT_MISMATCH,
-	VIDEO_STATS_FRAME_GAP_ERR,
-	VIDEO_STATS_FRAME_FORMAT_ERR,
-	VIDEO_STATS_FRAME_SHORT,
-	VIDEO_STATS_FRAME_LONG,
-	VIDEO_STATS_FRAME_CORRUPT,
-	VIDEO_STATS_FRAME_DROP,
-	VIDEO_STATS_NO_VIDEO_BUF,
-	VIDEO_STATS_NUM
-};
 
 typedef struct zynq_video_buffer {
 	struct vb2_v4l2_buffer	vbuf;
@@ -106,12 +87,9 @@ typedef struct zynq_video {
 	struct mutex		slock;	/* Lock for vb queue streaming */
 	spinlock_t		qlock;	/* Lock for driver owned queues */
 	spinlock_t		rlock;	/* lock for rx proc and reset */
-	struct completion	watchdog_completion;
-	struct task_struct	*watchdog_taskp;
 	unsigned char		*dev_cfg;
 	unsigned int		meta_header_lines;
 	unsigned int		meta_footer_lines;
-	unsigned long		data_range[4];
 
 	unsigned int		state;
 	unsigned int		input;
@@ -121,9 +99,14 @@ typedef struct zynq_video {
 
 	unsigned int		fps;
 	unsigned int		t_row;
+	unsigned int		t_first;
+	unsigned int		t_middle;
+	unsigned int		t_last;
 	unsigned int		frame_interval;
+	unsigned int		frame_usec_max;
 	unsigned int		frame_err_cnt;
 	unsigned int		last_exp_time;
+	unsigned int		last_trig_delay;
 	unsigned int		last_meta_cnt;
 	unsigned int		last_trig_cnt;
 	struct timeval		last_tv_intr;
@@ -133,6 +116,7 @@ typedef struct zynq_video {
 	zynq_stats_t		stats[VIDEO_STATS_NUM];
 	char			prefix[ZYNQ_LOG_PREFIX_LEN];
 
+	void			(*read_em_data)(struct zynq_video *, void *);
 } zynq_video_t;
 
 extern void zvideo_rx_proc(zynq_video_t *zvideo);
@@ -143,6 +127,7 @@ extern int zvideo_register_vdev(zynq_video_t *zvideo);
 extern void zvideo_unregister_vdev(zynq_video_t *zvideo);
 extern void zvideo_link_change(zynq_video_t *zvideo);
 extern void zvideo_get_timestamp(struct timeval *tv);
+extern void zvideo_watchdog(zynq_video_t *zvideo);
 
 extern struct v4l2_pix_format zvideo_formats[];
 

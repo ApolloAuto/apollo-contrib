@@ -29,20 +29,14 @@ static unsigned int zynq_mr_cnt = 0;
 zynq_dev_t *zynq_zdev_init(unsigned short zdev_did)
 {
 	zynq_dev_t *zdev;
-	int hw_cap;
 	int can_cnt, video_cnt, chan_cnt;
 	unsigned long video_map, can_map;
-	char code_name[ZYNQ_DEV_CODE_NAME_LEN];
 
 	switch (zdev_did) {
 	case PCI_DEVICE_ID_MOONROVER:
-		hw_cap = ZYNQ_HW_CAP_CAN | ZYNQ_HW_CAP_GPS |
-		    ZYNQ_HW_CAP_TRIGGER | ZYNQ_HW_CAP_FW |
-		    ZYNQ_HW_CAP_I2C | ZYNQ_HW_CAP_VIDEO;
 		chan_cnt = ZYNQ_DMA_CHAN_NUM_MR;
 		video_map = ZYNQ_VIDEO_MAP_MR;
 		can_map = ZYNQ_CAN_MAP_MR;
-		sprintf(code_name, "MoonRover");
 		break;
 	default:
 		zynq_err("%s: Unknown Device ID 0x%x\n",
@@ -53,7 +47,6 @@ zynq_dev_t *zynq_zdev_init(unsigned short zdev_did)
 	if (zynq_fwupdate_param) {
 		switch (zdev_did) {
 		case PCI_DEVICE_ID_MOONROVER:
-			hw_cap = ZYNQ_HW_CAP_FW;
 			chan_cnt = 0;
 			can_map = 0;
 			video_map = 0;
@@ -83,8 +76,6 @@ zynq_dev_t *zynq_zdev_init(unsigned short zdev_did)
 	zdev->zdev_video_cnt = video_cnt;
 	zdev->zdev_can_map = can_map;
 	zdev->zdev_video_map = video_map;
-	zdev->zdev_hw_cap = hw_cap;
-	memcpy(zdev->zdev_code_name, code_name, ZYNQ_DEV_CODE_NAME_LEN);
 
 	zdev->zdev_chans = (zynq_chan_t *)((char *)zdev + sizeof(zynq_dev_t));
 	zdev->zdev_cans = (zynq_can_t *)((char *)zdev->zdev_chans +
@@ -92,28 +83,56 @@ zynq_dev_t *zynq_zdev_init(unsigned short zdev_did)
 	zdev->zdev_videos = (zynq_video_t *)((char *)zdev->zdev_cans +
 	    can_cnt * sizeof(zynq_can_t));
 
-	if (zynq_fwupdate_param) {
-		zdev->zcan_tx_dma = 0;
-		zdev->zcan_rx_dma = 0;
-	} else {
-		zdev->zcan_tx_dma = 0;
-		zdev->zcan_rx_dma = 1;
-	}
+	return (zdev);
+}
 
-	switch (zdev_did) {
+void zynq_check_hw_caps(zynq_dev_t *zdev)
+{
+	char code_name[ZYNQ_DEV_CODE_NAME_LEN] = { 0 };
+	const int *video_port_map = NULL;
+	int hw_cap = 0;
+
+	switch (zdev->zdev_did) {
 	case PCI_DEVICE_ID_MOONROVER:
-		zdev->zdev_video_port_map = video_port_map_mr;
+		hw_cap = ZYNQ_HW_CAP_CAN | ZYNQ_HW_CAP_GPS |
+		    ZYNQ_HW_CAP_TRIGGER | ZYNQ_HW_CAP_FW |
+		    ZYNQ_HW_CAP_I2C | ZYNQ_HW_CAP_VIDEO;
+		if (ZDEV_PL_VER(zdev) >= 0x106) {
+			hw_cap |= ZYNQ_HW_CAP_FPGA_TIME_INIT |
+			    ZYNQ_HW_CAP_GPS_SMOOTH;
+		}
+		video_port_map = video_port_map_mr;
+		sprintf(code_name, "MoonRover");
 		break;
 	default:
 		break;
 	}
 
-	return (zdev);
-}
+	if (zynq_fwupdate_param) {
+		switch (zdev->zdev_did) {
+		case PCI_DEVICE_ID_MOONROVER:
+			hw_cap = ZYNQ_HW_CAP_FW;
+			break;
+		default:
+			break;
+		}
+	}
 
-void zynq_check_fw_version(zynq_dev_t *zdev)
-{
+	if (zynq_enable_can_rx_dma) {
+		zdev->zcan_rx_dma = 1;
+	} else {
+		zdev->zcan_rx_dma = 0;
+	}
+	if (zynq_enable_can_tx_dma) {
+		zdev->zcan_tx_dma = 1;
+	} else {
+		zdev->zcan_tx_dma = 0;
+	}
 	zdev->zcan_rx_hw_ts = 1;
+
+	zdev->zdev_hw_cap = hw_cap;
+	zdev->zdev_video_port_map = video_port_map;
+	memcpy(zdev->zdev_code_name, code_name, ZYNQ_DEV_CODE_NAME_LEN);
 }
 
 int zynq_create_cdev_all(zynq_dev_t *zdev)
@@ -236,7 +255,4 @@ module_exit(basa_exit);
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("BAIDU USA, LLC");
 MODULE_DESCRIPTION("basa: Baidu Sensor Aggregator Driver");
-/*
- * 2.1.1.1: Initial release for Sensor FPGA support.
- */
 MODULE_VERSION(ZYNQ_MOD_VER);

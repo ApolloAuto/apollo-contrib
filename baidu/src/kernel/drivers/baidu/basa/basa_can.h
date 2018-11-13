@@ -35,30 +35,6 @@ enum zynq_state {
 	ZYNQ_STATE_STOP
 };
 
-enum zynq_can_stats {
-	CAN_STATS_PIO_RX = 0,
-	CAN_STATS_PIO_TX,
-	CAN_STATS_PIO_TX_HI,
-	CAN_STATS_USR_RX_WAIT,
-	CAN_STATS_USR_RX_WAIT_INT,
-	CAN_STATS_USR_RX_TIMEOUT,
-	CAN_STATS_USR_RX_PARTIAL,
-	CAN_STATS_BUS_OFF,
-	CAN_STATS_STATUS_ERR,
-	CAN_STATS_RX_IP_FIFO_OVF,
-	CAN_STATS_RX_USR_FIFO_OVF,
-	CAN_STATS_TX_TIMEOUT,
-	CAN_STATS_TX_LP_FIFO_FULL,
-	CAN_STATS_RX_USR_FIFO_FULL,
-	CAN_STATS_TX_HP_FIFO_FULL,
-	CAN_STATS_CRC_ERR,
-	CAN_STATS_FRAME_ERR,
-	CAN_STATS_STUFF_ERR,
-	CAN_STATS_BIT_ERR,
-	CAN_STATS_ACK_ERR,
-	CAN_STATS_NUM
-};
-
 /* CAN message format: 16 bytes */
 typedef struct zcan_msg {
 	/* first word */
@@ -103,7 +79,9 @@ enum zcan_ip_mode {
 #define	ZCAN_IP_RXFIFO_MAX	64 /* up to 64 messages */
 #define	ZCAN_TIMEOUT_MAX	0xffffffff
 
-#define	ZCAN_IP_MSG_NUM		1024
+#define	ZCAN_IP_MSG_MIN		256
+#define	ZCAN_IP_MSG_MAX		65536
+#define	ZCAN_IP_MSG_NUM		2048
 
 typedef struct zynq_can {
 	struct zynq_dev		*zdev;

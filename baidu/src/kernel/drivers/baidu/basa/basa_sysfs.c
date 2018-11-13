@@ -751,7 +751,7 @@ static ssize_t zynq_sysfs_chan_pio_info_show(zynq_dev_t *zdev, char *buf)
 	    zcan->zcan_usr_buf_num, zcan->zcan_usr_rx_num,
 	    zcan->zcan_pio_baudrate, zcan->zcan_usr_rx_seq);
 
-	if (zynq_trace_param || zynq_dbg_reg_dump_param) {
+	if ((zynq_trace_param & ZYNQ_TRACE_CAN) || zynq_dbg_reg_dump_param) {
 		zcan_pio_dbg_reg_dump_ch(zcan);
 	}
 

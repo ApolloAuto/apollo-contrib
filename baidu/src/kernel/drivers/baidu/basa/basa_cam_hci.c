@@ -330,6 +330,95 @@ end:
 	return ret;
 }
 
+static void zcam_init_time_params(zynq_video_t *zvideo)
+{
+	zynq_cam_caps_t *caps = &zvideo->caps;
+
+	zvideo->t_row = T_ROW(caps->line_len_pck, caps->pixel_clock);
+	zvideo->t_first = T_FRAME(caps->frame_len_lines,
+	    caps->line_len_pck, caps->pixel_clock);
+	zvideo->t_middle = zvideo->t_first + T_FRAME(ZVIDEO_IMAGE_HEIGHT / 2,
+	    caps->line_len_pck, caps->pixel_clock);
+	zvideo->t_last = zvideo->t_first + T_FRAME(ZVIDEO_IMAGE_HEIGHT,
+	    caps->line_len_pck, caps->pixel_clock);
+}
+
+static void zcam_read_embedded_data_230(zynq_video_t *zvideo, void *buf)
+{
+	zynq_dev_t *zdev = zvideo->zdev;
+	unsigned int frame_count = 0;
+	unsigned short frame_lines = 0;
+	unsigned short line_pck = 0;
+	unsigned short coarse_int = 0;
+
+	if (EM_REG_VAL_230(buf, BASE) == EM_REG_CHIP_VER) {
+		frame_count = EM_REG_VAL_230(buf, FRAME_CNT);
+		zvideo->last_meta_cnt = frame_count;
+
+		frame_lines = EM_REG_VAL_230(buf, FRAME_LNS);
+		if (frame_lines != zvideo->caps.frame_len_lines) {
+			zynq_log("%d vid%d %s: changed frame_length_lines, "
+			    "new: %u, old: %u\n",
+			    zdev->zdev_inst, zvideo->index, __FUNCTION__,
+			    frame_lines, zvideo->caps.frame_len_lines);
+			zvideo->caps.frame_len_lines = frame_lines;
+			zcam_init_time_params(zvideo);
+		}
+
+		line_pck = EM_REG_VAL_230(buf, LINE_PCK) << 1;
+		if (line_pck != zvideo->caps.line_len_pck) {
+			zynq_log("%d vid%d %s: changed line_length_pck, "
+			    "new: %u, old: %u\n",
+			    zdev->zdev_inst, zvideo->index, __FUNCTION__,
+			    line_pck, zvideo->caps.line_len_pck);
+			zvideo->caps.line_len_pck = line_pck;
+			zcam_init_time_params(zvideo);
+		}
+
+		coarse_int = EM_REG_VAL_230(buf, COARSE_INT);
+		zvideo->last_exp_time = T_FRAME(coarse_int,
+		    zvideo->caps.line_len_pck, zvideo->caps.pixel_clock);
+	}
+
+	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: "
+	    "sequence=%u, frame_count=%u, frame_lines=%u, line_pck=%u, "
+	    "coarse_int=%u, exposure_time=%uus\n",
+	    zdev->zdev_inst, zvideo->index, __FUNCTION__,
+	    zvideo->sequence, frame_count, frame_lines, line_pck,
+	    coarse_int, zvideo->last_exp_time);
+}
+
+static void zcam_read_embedded_data_231(zynq_video_t *zvideo, void *buf)
+{
+	zynq_dev_t *zdev = zvideo->zdev;
+	unsigned int frame_count = 0;
+	unsigned int t1_clk = 0;
+	unsigned int t1_row = 0;
+	unsigned int line_pck = 0;
+
+	if (EM_REG_VAL_231(buf, BASE1) == EM_REG_FRAME_CNT_HI) {
+		frame_count = (EM_REG_VAL_231(buf, FRAME_CNT_HI) << 16) |
+		    EM_REG_VAL_231(buf, FRAME_CNT_LO);
+		zvideo->last_meta_cnt = frame_count;
+	}
+
+	if (EM_REG_VAL_231(buf, BASE2) == EM_REG_EXP_T1_ROW) {
+		t1_row = EM_REG_VAL_231(buf, EXP_T1_ROW);
+		t1_clk = (EM_REG_VAL_231(buf, EXP_T1_CLK_HI) << 16) |
+		    EM_REG_VAL_231(buf, EXP_T1_CLK_LO);
+		line_pck = t1_clk / t1_row;
+		zvideo->last_exp_time = T_FRAME(t1_row,
+		    zvideo->caps.line_len_pck, zvideo->caps.pixel_clock);
+	}
+
+	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: "
+	    "sequence=%u, frame_count=%u, t1_row=%u, t1_clk=%u, "
+	    "line_pck=%u, exposure_time=%uus\n",
+	    zdev->zdev_inst, zvideo->index, __FUNCTION__,
+	    zvideo->sequence, frame_count, t1_row, t1_clk, line_pck,
+	    zvideo->last_exp_time);
+}
+
 static int zcam_probe(zynq_video_t *zvideo)
 {
 	zynq_dev_t *zdev = zvideo->zdev;
@@ -357,7 +446,16 @@ probe:
 	for (i = 0; i < 10; i++) {
 		ret = zcam_i2c_read16(zvideo, REG_MON_MINOR_VERSION, &data);
 		if (!ret) {
-			caps->minor_version = data;
+			/*
+			 * Check the camera code name.
+			 * Pin-swap is always required for SharpVision cameras.
+			 */
+			if (((data >> 13) == CAM_CAP_CODENAME_SHARPVISION) &&
+			    (!caps->pin_swap)) {
+				ret = 0xFF;
+			} else {
+				caps->minor_version = data;
+			}
 			break;
 		}
 		udelay(ZCAM_WAIT_DELAY);
@@ -390,7 +488,11 @@ probe:
 		zvideo_reg_write(zvideo, ZYNQ_CAM_CONFIG, val);
 		spin_unlock(&zdev->zdev_lock);
 
-		msleep(500);
+		if (ret == 0xFF) {
+			msleep(20);
+		} else {
+			msleep(500);
+		}
 		zynq_trace(ZYNQ_TRACE_PROBE,
 		    "%d vid%d %s: re-probe with cam_config=0x%x\n",
 		    zdev->zdev_inst, zvideo->index, __FUNCTION__, val);
@@ -441,9 +543,9 @@ int zcam_check_caps(zynq_video_t *zvideo)
 	caps->interface_type = CAM_CAP_INTERFACE_PARALLEL;
 	caps->trigger_mode = 0;
 	caps->embedded_data = 0;
-	caps->frame_len_lines = 0;
-	caps->line_len_pck = 0;
-	caps->pixel_clock = DEFAULT_PIXCLK;
+	caps->frame_len_lines = DEFAULT_FRAME_LINES_230;
+	caps->line_len_pck = DEFAULT_LINE_PCK_230;
+	caps->pixel_clock = DEFAULT_PIXCLK_230;
 
         if (zynq_video_pin_swap >= 0) {
 		/* Force the pin-swap status */
@@ -531,6 +633,10 @@ int zcam_check_caps(zynq_video_t *zvideo)
 	*p16 = 0;
 	if (!zcam_i2c_read16(zvideo, addr, p16)) {
 		caps->frame_len_lines = *p16;
+	} else if (caps->code_name == CAM_CAP_CODENAME_SHARPVISION) {
+		caps->frame_len_lines = DEFAULT_FRAME_LINES_231;
+	} else {
+		caps->frame_len_lines = DEFAULT_FRAME_LINES_230;
 	}
 
 	/* Check the line length pck */
@@ -538,33 +644,43 @@ int zcam_check_caps(zynq_video_t *zvideo)
 	*p16 = 0;
 	if (!zcam_i2c_read16(zvideo, addr, p16)) {
 		caps->line_len_pck = *p16;
+	} else if (caps->code_name == CAM_CAP_CODENAME_SHARPVISION) {
+		caps->line_len_pck = DEFAULT_LINE_PCK_231;
+	} else {
+		caps->line_len_pck = DEFAULT_LINE_PCK_230;
 	}
 
 	/* Check the pixel clock */
 	addr = REG_SNSR_CFG_PIXCLK;
 	*p32 = 0;
 	ret = zcam_i2c_read32(zvideo, addr, p32);
-	if (ret || (*p32 == 0)) {
-		caps->pixel_clock = DEFAULT_PIXCLK;
-	} else {
+	if (!ret && *p32) {
 		caps->pixel_clock = *p32;
+	} else if (caps->code_name == CAM_CAP_CODENAME_SHARPVISION) {
+		caps->pixel_clock = DEFAULT_PIXCLK_231;
+	} else {
+		caps->pixel_clock = DEFAULT_PIXCLK_230;
 	}
 end:
 	zcam_i2c_fini(zvideo);
 	spin_unlock(&zdev->zdev_lock);
+
+	zcam_init_time_params(zvideo);
 
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: "
 	    "name=%s, unique_id=0x%04hx, major_version=0x%04hx, "
 	    "minor_version=0x%04hx, timestamp_type=%u, "
 	    "trigger_mode=%u, embedded_data=%u, "
 	    "interface_type=%u, pin_swap=%u, "
-	    "frame_length_lines=%hu, line_length_pck=%hu, pixclk=%u\n",
+	    "frame_length_lines=%hu, line_length_pck=%hu, pixclk=%u, "
+	    "t_row=%u, t_frame=%u\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__,
 	    caps->name, caps->unique_id, caps->major_version,
 	    caps->minor_version, caps->timestamp_type,
 	    caps->trigger_mode, caps->embedded_data,
 	    caps->interface_type, caps->pin_swap,
-	    caps->frame_len_lines, caps->line_len_pck, caps->pixel_clock);
+	    caps->frame_len_lines, caps->line_len_pck, caps->pixel_clock,
+	    zvideo->t_row, zvideo->t_first);
 
 	if (zynq_video_flash_16 > 0) {
 		caps->feature |= CAM_CAP_FEATURE_FLASH_ADDR_16;
@@ -576,6 +692,12 @@ end:
 		zvideo->dev_cfg = zcam_dev_cfgs[1];
 	} else {
 		zvideo->dev_cfg = zcam_dev_cfgs[0];
+	}
+
+	if (caps->code_name == CAM_CAP_CODENAME_SHARPVISION) {
+		zvideo->read_em_data = zcam_read_embedded_data_231;
+	} else {
+		zvideo->read_em_data = zcam_read_embedded_data_230;
 	}
 
 	return ret;

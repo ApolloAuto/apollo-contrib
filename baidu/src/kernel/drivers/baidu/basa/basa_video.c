@@ -19,7 +19,6 @@
 
 #include <linux/module.h>
 #include <linux/delay.h>
-#include <linux/kthread.h>
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-event.h>
 #include <media/videobuf2-vmalloc.h>
@@ -32,7 +31,7 @@ static unsigned int zynq_video_format = 0;
 
 int zynq_video_pin_swap = -1;
 int zynq_video_flash_16 = -1;
-unsigned int zynq_video_ts_type = CAM_CAP_TIMESTAMP_FPGA;
+unsigned int zynq_video_ts_type = CAM_CAP_TIMESTAMP_FORMATION;
 unsigned int zynq_video_buf_num = ZVIDEO_VBUF_MIN_NUM;
 unsigned int zynq_video_zero_copy = 1;
 
@@ -65,8 +64,7 @@ static const char zvideo_stats_label[VIDEO_STATS_NUM][ZYNQ_STATS_LABEL_LEN] = {
 	"Trigger pulse error",
 	"Link change",
 	"DMA Rx buffer full",
-	"FPD link unlock",
-	"FIFO full",
+	"DMA Rx FIFO full",
 	"Trigger count mismatch",
 	"Metadata count mismatch",
 	"Frame gap error",
@@ -74,7 +72,10 @@ static const char zvideo_stats_label[VIDEO_STATS_NUM][ZYNQ_STATS_LABEL_LEN] = {
 	"Frame too short",
 	"Frame too long",
 	"Frame corrupted",
-	"Frame drop",
+	"Frame drop total",
+	"Frame drop 1",
+	"Frame drop 2",
+	"Frame drop 3+",
 	"No video buffer"
 };
 
@@ -82,24 +83,6 @@ static const char ts_label_host[] = "HOST";
 static const char ts_label_formation[] = "EXP";
 static const char ts_label_trigger[] = "TRIG";
 static const char ts_label_fpga[] = "FPGA";
-
-/*
- * Set the data ranges that will be used for copying the image data
- * with all meta data excluded.
- */
-static void zvideo_set_data_range(zynq_video_t *zvideo)
-{
-	unsigned long offset;
-
-	offset = zvideo->format.bytesperline * zvideo->meta_header_lines;
-	zvideo->data_range[0] = offset;
-	offset += zvideo->format.bytesperline * ZVIDEO_IMAGE_HEIGHT;
-	zvideo->data_range[1] = offset;
-	offset += zvideo->format.bytesperline * zvideo->meta_footer_lines;
-	zvideo->data_range[2] = offset;
-	offset += ZVIDEO_EXT_META_DATA_BYTES;
-	zvideo->data_range[3] = offset;
-}
 
 static void zvideo_set_format(zynq_video_t *zvideo)
 {
@@ -115,8 +98,6 @@ static void zvideo_set_format(zynq_video_t *zvideo)
 		zvideo->format.sizeimage = zvideo->format.bytesperline *
 		    zvideo->format.height + ZVIDEO_EXT_META_DATA_BYTES;
 	}
-
-	zvideo_set_data_range(zvideo);
 }
 
 static inline zynq_video_buffer_t *vb_to_zvb(struct vb2_buffer *vb)
@@ -143,7 +124,6 @@ static void zvideo_config(zynq_video_t *zvideo)
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: zvideo=0x%p\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__, zvideo);
 
-	spin_lock(&zdev->zdev_lock);
 	cam_cfg = zvideo_reg_read(zvideo, ZYNQ_CAM_CONFIG);
 
 	cam_cfg = SET_BITS(ZYNQ_CAM_HEADER, cam_cfg, zvideo->meta_header_lines);
@@ -154,15 +134,10 @@ static void zvideo_config(zynq_video_t *zvideo)
 	} else {
 		cam_cfg &= ~ZYNQ_CAM_RGB_YUV_SEL;
 	}
-	if (zynq_video_ts_type == CAM_CAP_TIMESTAMP_TRIGGER) {
-		cam_cfg &= ~ZYNQ_CAM_TIMESTAMP_RCV;
-	} else {
-		cam_cfg |= ZYNQ_CAM_TIMESTAMP_RCV;
-	}
+	cam_cfg |= ZYNQ_CAM_TIMESTAMP_RCV;
 	cam_cfg |= ZYNQ_CAM_COLOR_SWAP;
 
 	zvideo_reg_write(zvideo, ZYNQ_CAM_CONFIG, cam_cfg);
-	spin_unlock(&zdev->zdev_lock);
 }
 
 void zvideo_enable(zynq_video_t *zvideo)
@@ -174,11 +149,9 @@ void zvideo_enable(zynq_video_t *zvideo)
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__, zvideo);
 
 	/* Enable the trigger */
-	spin_lock(&zdev->zdev_lock);
 	cam_cfg = zvideo_reg_read(zvideo, ZYNQ_CAM_CONFIG);
 	cam_cfg |= ZYNQ_CAM_EN;
 	zvideo_reg_write(zvideo, ZYNQ_CAM_CONFIG, cam_cfg);
-	spin_unlock(&zdev->zdev_lock);
 }
 
 void zvideo_disable(zynq_video_t *zvideo)
@@ -190,11 +163,9 @@ void zvideo_disable(zynq_video_t *zvideo)
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__, zvideo);
 
 	/* Disable the trigger */
-	spin_lock(&zdev->zdev_lock);
 	cam_cfg = zvideo_reg_read(zvideo, ZYNQ_CAM_CONFIG);
 	cam_cfg &= ~ZYNQ_CAM_EN;
 	zvideo_reg_write(zvideo, ZYNQ_CAM_CONFIG, cam_cfg);
-	spin_unlock(&zdev->zdev_lock);
 }
 
 static void zvideo_cam_reset(zynq_video_t *zvideo)
@@ -205,14 +176,12 @@ static void zvideo_cam_reset(zynq_video_t *zvideo)
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: zvideo=0x%p\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__, zvideo);
 
-	spin_lock(&zdev->zdev_lock);
 	cam_cfg = zvideo_reg_read(zvideo, ZYNQ_CAM_CONFIG);
 	cam_cfg |= ZYNQ_CAM_SENSOR_RESET;
 	zvideo_reg_write(zvideo, ZYNQ_CAM_CONFIG, cam_cfg);
 	mdelay(1);
 	cam_cfg &= ~ZYNQ_CAM_SENSOR_RESET;
 	zvideo_reg_write(zvideo, ZYNQ_CAM_CONFIG, cam_cfg);
-	spin_unlock(&zdev->zdev_lock);
 
 	zvideo->last_meta_cnt = UINT_MAX;
 }
@@ -225,48 +194,57 @@ static void zvideo_reset(zynq_video_t *zvideo)
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: zvideo=0x%p\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__, zvideo);
 
-	/* Disable trigger */
-	zvideo_disable(zvideo);
-
 	spin_lock_bh(&zvideo->rlock);
 	spin_lock_bh(&zvideo->qlock);
 
-	if (zynq_video_zero_copy) {
-		while (zvideo->buf_avail != zvideo->buf_total) {
-			spin_unlock_bh(&zvideo->qlock);
-			spin_unlock_bh(&zvideo->rlock);
-			if (retry >= 5) {
-				/* Give up and re-enable the trigger */
-				zynq_err("%d vid%d %s: Reset given up\n",
-				    zdev->zdev_inst, zvideo->index,
-				    __FUNCTION__);
-				zvideo_enable(zvideo);
-				return;
+	if (zvideo->state & ZVIDEO_STATE_STREAMING) {
+		/* Disable trigger */
+		zvideo_disable(zvideo);
+
+		if (zynq_video_zero_copy) {
+			while (zvideo->buf_avail != zvideo->buf_total) {
+				if (retry >= 5) {
+					/* Give up and re-enable the trigger */
+					zynq_err("%d vid%d %s: Reset aborted\n",
+					    zdev->zdev_inst, zvideo->index,
+					    __FUNCTION__);
+					zvideo_enable(zvideo);
+				}
+				spin_unlock_bh(&zvideo->qlock);
+				spin_unlock_bh(&zvideo->rlock);
+				if (retry >= 5) {
+					return;
+				}
+				msleep(10);
+				retry++;
+				spin_lock_bh(&zvideo->rlock);
+				spin_lock_bh(&zvideo->qlock);
 			}
-			msleep(10);
-			retry++;
-			spin_lock_bh(&zvideo->rlock);
-			spin_lock_bh(&zvideo->qlock);
 		}
 	}
 
 	ZYNQ_STATS_LOGX(zvideo, VIDEO_STATS_RESET, 1, 0);
-	zvideo->state &= ~ZVIDEO_STATE_FAULT;
+	zvideo->state &= ~ZVIDEO_STATE_CHAN_FAULT;
 
-	/* Reset the camera sensor */
-	zvideo_cam_reset(zvideo);
+	if (zvideo->state & ZVIDEO_STATE_CAM_FAULT) {
+		/* Reset the camera sensor */
+		zvideo_cam_reset(zvideo);
+		zvideo->state &= ~ZVIDEO_STATE_CAM_FAULT;
+	}
 
-	/* Reset and start the DMA channel */
-	zchan_rx_start(zvideo->zchan);
+	if (zvideo->state & ZVIDEO_STATE_STREAMING) {
+		/* Reset and start the DMA channel */
+		zchan_rx_start(zvideo->zchan);
+
+		/* Re-config the video channel */
+		zvideo_config(zvideo);
+
+		/* Re-enable the trigger */
+		zvideo_enable(zvideo);
+	}
 
 	spin_unlock_bh(&zvideo->qlock);
 	spin_unlock_bh(&zvideo->rlock);
-
-	/* Re-config the video channel */
-	zvideo_config(zvideo);
-
-	/* Re-enable the trigger */
-	zvideo_enable(zvideo);
 }
 
 /*
@@ -316,6 +294,76 @@ inline static unsigned long div_round(unsigned long val, unsigned long round)
 	return result;
 }
 
+inline static void tv_sub(struct timeval *tv, unsigned int usec)
+{
+	if (tv->tv_usec < usec) {
+		tv->tv_sec--;
+		tv->tv_usec += USEC_PER_SEC;
+	}
+	tv->tv_usec -= usec;
+}
+
+inline static void tv_add(struct timeval *tv, unsigned int usec)
+{
+	tv->tv_usec += usec;
+	if (tv->tv_usec >= USEC_PER_SEC) {
+		tv->tv_sec++;
+		tv->tv_usec -= USEC_PER_SEC;
+	}
+}
+
+inline static void fpga_to_trigger(zynq_video_t *zvideo,
+		zynq_video_ext_meta_data_t *ext, struct timeval *tv)
+{
+	unsigned int trigger_delay = zvideo->last_trig_delay;
+
+	tv->tv_sec = ext->time_stamp.sec;
+	tv->tv_usec = ext->time_stamp.usec;
+
+	tv_sub(tv, zvideo->t_first + trigger_delay);
+
+	tv->tv_usec -= tv->tv_usec % zvideo->frame_interval;
+	if (tv->tv_usec >= (zvideo->frame_usec_max - 100)) {
+		tv->tv_sec++;
+		tv->tv_usec = 0;
+	}
+
+	tv_add(tv, trigger_delay);
+}
+
+inline static void fpga_to_formation(zynq_video_t *zvideo,
+		zynq_video_ext_meta_data_t *ext, struct timeval *tv)
+{
+	fpga_to_trigger(zvideo, ext, tv);
+
+	tv_add(tv, zvideo->t_middle - (zvideo->last_exp_time / 2));
+}
+
+inline static void host_to_trigger(zynq_video_t *zvideo, struct timeval *tv)
+{
+	unsigned int trigger_delay = zvideo->last_trig_delay;
+
+	tv->tv_sec = zvideo->tv_intr.tv_sec;
+	tv->tv_usec = zvideo->tv_intr.tv_usec;
+
+	tv_sub(tv, zvideo->t_last + trigger_delay);
+
+	tv->tv_usec -= tv->tv_usec % zvideo->frame_interval;
+	if (tv->tv_usec >= (zvideo->frame_usec_max - 100)) {
+		tv->tv_sec++;
+		tv->tv_usec = 0;
+	}
+
+	tv_add(tv, trigger_delay);
+}
+
+inline static void host_to_formation(zynq_video_t *zvideo, struct timeval *tv)
+{
+	host_to_trigger(zvideo, tv);
+
+	tv_add(tv, zvideo->t_middle - (zvideo->last_exp_time / 2));
+}
+
 /*
  * Check the meta data saved in the v4l2 buffer
  */
@@ -329,14 +377,11 @@ static int zvideo_check_meta_data(zynq_video_t *zvideo,
 	unsigned char *mem;
 	unsigned long memsz;
 	unsigned int trig_cnt;
-	unsigned int exp_time = 0;
-	unsigned short meta_cnt = 0;
-	unsigned short frame_len_lines = 0;
-	unsigned short line_len_pck = 0;
-	unsigned short coarse_int = 0;
+	unsigned int last_cnt;
 	int meta_cnt_gap = -1;
 	int trig_cnt_gap = -1;
 	long cnt_gap = -1;
+	long drop_cnt;
 	long ts_gap;
 	int corrupted;
 	int ret = 0;
@@ -347,33 +392,22 @@ static int zvideo_check_meta_data(zynq_video_t *zvideo,
 	/* Check camera embedded header metadata */
 	if (zvideo->caps.embedded_data == 1) {
 		if (EM_DATA_VALID(mem)) {
-			meta_cnt = EM_REG_VAL(mem, EM_REG_FRAME_COUNT);
-			coarse_int = EM_REG_VAL(mem, EM_REG_COARSE_INT);
-			frame_len_lines =
-			    EM_REG_VAL(mem, EM_REG_FRAME_LEN_LINES);
-			line_len_pck =
-			    EM_REG_VAL(mem, EM_REG_LINE_LEN_PCK) * 2;
-			if (!zvideo->t_row) {
-				zvideo->t_row = T_ROW(line_len_pck,
-				    zvideo->caps.pixel_clock);
-			}
+			last_cnt = zvideo->last_meta_cnt;
 
-			if (zvideo->last_meta_cnt != UINT_MAX) {
+			zvideo->read_em_data(zvideo, mem);
+
+			if (last_cnt != UINT_MAX) {
 				/* The first frame is ignored */
-				meta_cnt_gap = meta_cnt - zvideo->last_meta_cnt;
+				meta_cnt_gap = zvideo->last_meta_cnt - last_cnt;
 				if (meta_cnt_gap == 0) {
 					zynq_err("%d vid%d %s: WARNING! "
 					    "metadata frame count error, "
 					    "sequence %u, current %u, last %u\n",
 					    zdev->zdev_inst, zvideo->index,
 					    __FUNCTION__, zvideo->sequence,
-					    meta_cnt, zvideo->last_meta_cnt);
+					    zvideo->last_meta_cnt, last_cnt);
 				}
 			}
-			zvideo->last_meta_cnt = meta_cnt;
-
-			exp_time = coarse_int * zvideo->t_row;
-			zvideo->last_exp_time = exp_time;
 		} else {
 			zynq_trace(ZYNQ_TRACE_PROBE,
 			    "%d vid%d %s: invalid header metadata\n",
@@ -423,9 +457,9 @@ static int zvideo_check_meta_data(zynq_video_t *zvideo,
 		    __FUNCTION__, zvideo->frame_err_cnt);
 		zvideo->frame_err_cnt = 0;
 		spin_lock(&zvideo->qlock);
-		zvideo->state |= ZVIDEO_STATE_FAULT;
+		zvideo->state |= ZVIDEO_STATE_CHAN_FAULT;
 		spin_unlock(&zvideo->qlock);
-		complete(&zvideo->watchdog_completion);
+		zchan_watchdog_complete(zvideo->zchan);
 	}
 
 	if (zvideo->last_trig_cnt != 0) {
@@ -442,22 +476,10 @@ static int zvideo_check_meta_data(zynq_video_t *zvideo,
 	zvideo->last_trig_cnt = trig_cnt;
 
 	tv = &buf->vbuf.timestamp;
-	if (zynq_video_ts_type == CAM_CAP_TIMESTAMP_HOST) {
-		tv->tv_sec = zvideo->tv_intr.tv_sec;
-		tv->tv_usec = zvideo->tv_intr.tv_usec;
-		label = ts_label_host;
-	} else if ((zynq_video_ts_type == CAM_CAP_TIMESTAMP_FORMATION) &&
-	    (exp_time > 0)) {
-		tv->tv_sec = zvideo->tv_intr.tv_sec;
-		tv->tv_usec = zvideo->tv_intr.tv_usec -
-		    ((frame_len_lines / 2) * zvideo->t_row) -
-		    (exp_time / 2);
-		if (tv->tv_usec < 0) {
-			tv->tv_usec += USEC_PER_SEC;
-			tv->tv_sec--;
-		}
-		label = ts_label_formation;
-	} else {
+	switch (zynq_video_ts_type) {
+	default:
+	case CAM_CAP_TIMESTAMP_FPGA:
+fpga_time:
 		if (corrupted) {
 			tv->tv_sec = 0;
 			tv->tv_usec = 0;
@@ -465,8 +487,32 @@ static int zvideo_check_meta_data(zynq_video_t *zvideo,
 			tv->tv_sec = ext->time_stamp.sec;
 			tv->tv_usec = ext->time_stamp.usec;
 		}
-		label = (zynq_video_ts_type == CAM_CAP_TIMESTAMP_TRIGGER) ?
-		    ts_label_trigger : ts_label_fpga;
+		label = ts_label_fpga;
+		break;
+	case CAM_CAP_TIMESTAMP_TRIGGER:
+		if (corrupted) {
+			host_to_trigger(zvideo, tv);
+		} else {
+			fpga_to_trigger(zvideo, ext, tv);
+		}
+		label = ts_label_trigger;
+		break;
+	case CAM_CAP_TIMESTAMP_FORMATION:
+		if (zvideo->last_exp_time == 0) {
+			goto fpga_time;
+		}
+		if (corrupted) {
+			host_to_formation(zvideo, tv);
+		} else {
+			fpga_to_formation(zvideo, ext, tv);
+		}
+		label = ts_label_formation;
+		break;
+	case CAM_CAP_TIMESTAMP_HOST:
+		tv->tv_sec = zvideo->tv_intr.tv_sec;
+		tv->tv_usec = zvideo->tv_intr.tv_usec;
+		label = ts_label_host;
+		break;
 	}
 
 	buf->vbuf.sequence = zvideo->sequence;
@@ -532,25 +578,33 @@ static int zvideo_check_meta_data(zynq_video_t *zvideo,
 
 	if (cnt_gap > 1) {
 		/* Possible frame drop */
+		drop_cnt = cnt_gap - 1;
 		ZYNQ_STATS_LOGX(zvideo,
-		    VIDEO_STATS_FRAME_DROP, cnt_gap - 1, 0);
+		    VIDEO_STATS_FRAME_DROP, drop_cnt, 0);
+		if (drop_cnt == 1) {
+			ZYNQ_STATS(zvideo, VIDEO_STATS_FRAME_DROP_1);
+		} else if (drop_cnt == 2) {
+			ZYNQ_STATS(zvideo, VIDEO_STATS_FRAME_DROP_2);
+		} else {
+			ZYNQ_STATS(zvideo, VIDEO_STATS_FRAME_DROP_M);
+		}
 	}
 
 	ZYNQ_STATS(zvideo, VIDEO_STATS_FRAME);
 	zvideo->last_tv_intr = zvideo->tv_intr;
 
 	zynq_trace(ZYNQ_TRACE_PROBE,
-	    "%d vid%d %s: sequence=%u, trigger_cnt=%u, meta_cnt=%u, "
+	    "%d vid%d %s: sequence=%u, trigger_cnt=%u, "
 	    "ts[%s]=%ld.%06ld, host_ts=%ld.%06ld, "
 	    "meta_ts=%u.%06u, debug_ts=%u.%06u, "
-	    "error=0x%x, coarse_int=%u, exposure_time=%uus\n",
+	    "error=0x%x\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__,
-	    zvideo->sequence, ext->trigger_cnt, meta_cnt,
+	    zvideo->sequence, ext->trigger_cnt,
 	    label, tv->tv_sec, tv->tv_usec,
 	    zvideo->tv_intr.tv_sec, zvideo->tv_intr.tv_usec,
 	    ext->time_stamp.sec, ext->time_stamp.usec,
 	    ext->debug_ts.sec, ext->debug_ts.us_cnt << 8,
-	    ext->error, coarse_int, exp_time);
+	    ext->error);
 
 	return ret;
 }
@@ -1071,10 +1125,12 @@ static int zvideo_start_streaming(struct vb2_queue *vq, unsigned int count)
 
 	zvideo_init_params(zvideo);
 
+	spin_lock_bh(&zvideo->rlock);
 	spin_lock_bh(&zvideo->qlock);
 	if (zynq_video_zero_copy) {
 		if (zvideo_init_rx(zvideo, count)) {
 			spin_unlock_bh(&zvideo->qlock);
+			spin_unlock_bh(&zvideo->rlock);
 			return -ENOSR;
 		}
 	}
@@ -1094,6 +1150,7 @@ static int zvideo_start_streaming(struct vb2_queue *vq, unsigned int count)
 	/* Set the streaming flag */
 	zvideo->state |= ZVIDEO_STATE_STREAMING;
 	spin_unlock_bh(&zvideo->qlock);
+	spin_unlock_bh(&zvideo->rlock);
 
 	return 0;
 }
@@ -1111,6 +1168,7 @@ static void zvideo_stop_streaming(struct vb2_queue *vq)
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: vq=0x%p\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__, vq);
 
+	spin_lock_bh(&zvideo->rlock);
 	spin_lock_bh(&zvideo->qlock);
 	/* Clear the streaming flag */
 	zvideo->state &= ~ZVIDEO_STATE_STREAMING;
@@ -1130,6 +1188,7 @@ static void zvideo_stop_streaming(struct vb2_queue *vq)
 	 * The streaming flag is used to sync up data receiving.
 	 */
 	spin_unlock_bh(&zvideo->qlock);
+	spin_unlock_bh(&zvideo->rlock);
 
 	/* Release all active buffers */
 	zvideo_return_all_buffers(zvideo, VB2_BUF_STATE_ERROR);
@@ -1330,7 +1389,7 @@ static void zvideo_trigger_enable(zynq_video_t *zvideo, zynq_trigger_t *trigger)
 		trigger->fps = ZYNQ_FPD_FPS_DEFAULT;
 	}
 
-	spin_lock(&zdev->zdev_lock);
+	spin_lock(&zvideo->rlock);
 	/* 1. Disable the individual trigger */
 	val = zvideo_reg_read(zvideo, ZYNQ_CAM_CONFIG);
 	val &= ~ZYNQ_CAM_EN;
@@ -1347,6 +1406,7 @@ static void zvideo_trigger_enable(zynq_video_t *zvideo, zynq_trigger_t *trigger)
 	zvideo_reg_write(zvideo, ZYNQ_CAM_CONFIG, val);
 
 	/* 4. Enable the global trigger */
+	spin_lock(&zdev->zdev_lock);
 	val = zynq_g_reg_read(zdev, ZYNQ_G_CONFIG);
 	val &= ~ZYNQ_CONFIG_TRIGGER_MASK;
 	val |= ZYNQ_CONFIG_TRIGGER;
@@ -1354,10 +1414,12 @@ static void zvideo_trigger_enable(zynq_video_t *zvideo, zynq_trigger_t *trigger)
 		val |= ZYNQ_CONFIG_GPS_SW;
 	}
 	zynq_g_reg_write(zdev, ZYNQ_G_CONFIG, val);
+	spin_unlock(&zdev->zdev_lock);
 
 	zvideo->fps = trigger->fps;
 	zvideo->frame_interval = USEC_PER_SEC / trigger->fps;
-	spin_unlock(&zdev->zdev_lock);
+	zvideo->frame_usec_max = zvideo->frame_interval * zvideo->fps;
+	spin_unlock(&zvideo->rlock);
 
 	zynq_log("%d vid%d %s: done. fps=%u, internal=%u\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__,
@@ -1369,7 +1431,7 @@ static void zvideo_trigger_disable(zynq_video_t *zvideo)
 	zynq_dev_t *zdev = zvideo->zdev;
 	unsigned int val;
 
-	spin_lock(&zdev->zdev_lock);
+	spin_lock(&zvideo->rlock);
 	/* Disable the individual trigger */
 	val = zvideo_reg_read(zvideo, ZYNQ_CAM_CONFIG);
 	val &= ~ZYNQ_CAM_EN;
@@ -1377,7 +1439,8 @@ static void zvideo_trigger_disable(zynq_video_t *zvideo)
 
 	zvideo->fps = 0;
 	zvideo->frame_interval = 0;
-	spin_unlock(&zdev->zdev_lock);
+	zvideo->frame_usec_max = 0;
+	spin_unlock(&zvideo->rlock);
 
 	zynq_log("%d vid%d %s: done.\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__);
@@ -1389,11 +1452,13 @@ static void zvideo_trigger_delay_set(zynq_video_t *zvideo,
 	zynq_dev_t *zdev = zvideo->zdev;
 	unsigned int val;
 
-	spin_lock(&zdev->zdev_lock);
+	spin_lock(&zvideo->rlock);
 	val = zvideo_reg_read(zvideo, ZYNQ_CAM_TRIGGER);
 	val = SET_BITS(ZYNQ_CAM_TRIG_DELAY, val, delay->trigger_delay);
 	zvideo_reg_write(zvideo, ZYNQ_CAM_TRIGGER, val);
-	spin_unlock(&zdev->zdev_lock);
+	spin_unlock(&zvideo->rlock);
+
+	zvideo->last_trig_delay = delay->trigger_delay;
 
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: trigger_delay=%u\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__,
@@ -1406,13 +1471,15 @@ static void zvideo_trigger_delay_get(zynq_video_t *zvideo,
 	zynq_dev_t *zdev = zvideo->zdev;
 	unsigned int val;
 
-	spin_lock(&zdev->zdev_lock);
+	spin_lock(&zvideo->rlock);
 	val = zvideo_reg_read(zvideo, ZYNQ_CAM_TRIGGER);
 	val = GET_BITS(ZYNQ_CAM_TRIG_DELAY, val);
-	spin_unlock(&zdev->zdev_lock);
+	spin_unlock(&zvideo->rlock);
 
 	delay->trigger_delay = val;
 	delay->exposure_time = zvideo->last_exp_time;
+
+	ASSERT(zvideo->last_trig_delay == delay->trigger_delay);
 
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: "
 	    "trigger_delay=%u, exposure_time=%u\n",
@@ -1571,9 +1638,9 @@ static long zvideo_ioctl_default(struct file *file, void *fh,
 		    "%d vid%d ZYNQ_IOC_CAM_RESET\n",
 		    zdev->zdev_inst, zvideo->index);
 		spin_lock_bh(&zvideo->qlock);
-		zvideo->state |= ZVIDEO_STATE_FAULT;
+		zvideo->state |= ZVIDEO_STATE_CAM_FAULT;
 		spin_unlock_bh(&zvideo->qlock);
-		complete(&zvideo->watchdog_completion);
+		zchan_watchdog_complete(zvideo->zchan);
 		break;
 
 	case ZYNQ_IOC_TRIGGER_ENABLE_ONE:
@@ -1690,8 +1757,6 @@ static int zvideo_check_link_status(zynq_video_t *zvideo)
 	unsigned char prev;
 	int changed;
 
-	spin_lock(&zdev->zdev_lock);
-
 	status = zvideo_reg_read(zvideo, ZYNQ_CAM_STATUS);
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: camera status 0x%x\n",
 	    zdev->zdev_inst, zvideo->index, __FUNCTION__, status);
@@ -1704,8 +1769,6 @@ static int zvideo_check_link_status(zynq_video_t *zvideo)
 
 	changed = (zvideo->caps.link_up != prev);
 
-	spin_unlock(&zdev->zdev_lock);
-
 	return changed;
 }
 
@@ -1715,49 +1778,17 @@ static void zvideo_get_camera_info(zynq_video_t *zvideo)
 	zvideo_set_format(zvideo);
 }
 
-static int zvideo_watchdog(void *arg)
+void zvideo_watchdog(zynq_video_t *zvideo)
 {
-	zynq_video_t *zvideo = arg;
-	long result;
-
-	while (!kthread_should_stop()) {
-		result = wait_for_completion_interruptible_timeout(
-		    &zvideo->watchdog_completion, msecs_to_jiffies(1000));
-		if (result < 0) {
-			break;
-		}
-
-		if ((zvideo->state & ZVIDEO_STATE_LINK_CHANGE) &&
-		    (jiffies >= (zvideo->ts_link_change +
-		    msecs_to_jiffies(ZVIDEO_LINK_CHANGE_DELAY)))) {
-			zvideo_link_change(zvideo);
-		}
-
-		if (zvideo->state & ZVIDEO_STATE_FAULT) {
-			zvideo_reset(zvideo);
-		}
-
-		if (result > 0) {
-			reinit_completion(&zvideo->watchdog_completion);
-		}
+	if ((zvideo->state & ZVIDEO_STATE_LINK_CHANGE) &&
+	    (jiffies >= (zvideo->ts_link_change +
+	    msecs_to_jiffies(ZVIDEO_LINK_CHANGE_DELAY)))) {
+		zvideo_link_change(zvideo);
 	}
 
-	return 0;
-}
-
-static void zvideo_watchdog_init(zynq_video_t *zvideo)
-{
-	init_completion(&zvideo->watchdog_completion);
-	zvideo->watchdog_taskp = kthread_run(zvideo_watchdog,
-	    zvideo, "zynq video watchdog thread");
-}
-
-static void zvideo_watchdog_fini(zynq_video_t *zvideo)
-{
-	complete(&zvideo->watchdog_completion);
-	if (zvideo->watchdog_taskp) {
-		kthread_stop(zvideo->watchdog_taskp);
-		zvideo->watchdog_taskp = NULL;
+	if (zvideo->state &
+	    (ZVIDEO_STATE_CHAN_FAULT | ZVIDEO_STATE_CAM_FAULT)) {
+		zvideo_reset(zvideo);
 	}
 }
 
@@ -1918,8 +1949,6 @@ int zvideo_init(zynq_video_t *zvideo)
 		}
 	}
 
-	zvideo_watchdog_init(zvideo);
-
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d ch%d vid%d %s done\n",
 	    zdev->zdev_inst, zchan->zchan_num, zvideo->index, __FUNCTION__);
 
@@ -1941,7 +1970,6 @@ void zvideo_fini(zynq_video_t *zvideo)
 	    zdev->zdev_inst, zchan->zchan_num, zvideo->index,
 	    zvideo->caps.name, __FUNCTION__, zvideo);
 
-	zvideo_watchdog_fini(zvideo);
 	zvideo_unregister_vdev(zvideo);
 	v4l2_ctrl_handler_free(&zvideo->ctrl_handler);
 	v4l2_device_unregister(&zvideo->v4l2_dev);
@@ -2008,33 +2036,31 @@ static void zvideo_rx_proc_copy(zynq_video_t *zvideo)
 	unsigned long memsz;
 	unsigned long size;
 	unsigned long len;
-	u32 rx_head;
+	u32 hw_tail;
 	u32 rx_tail;
 	u32 rx_off;
 	void *data_phy;
 	void *data;
 
-	rx_head = zchan_rx->zchan_rx_head;
-	rx_tail = zchan_reg_read(zchan, ZYNQ_CH_RX_TAIL);
+	rx_off = zchan_rx->zchan_rx_head;
 
-	rx_off = rx_head;
+	hw_tail = zchan_reg_read(zchan, ZYNQ_CH_RX_TAIL);
+	rx_tail = hw_tail & ~(PAGE_SIZE - 1);
 
-	if ((rx_head >= zchan_rx->zchan_rx_size) ||
-	    (rx_tail >= zchan_rx->zchan_rx_size)) {
-		zynq_err("%d ch%d vid%d %s check failed: "
-		    "rx_head=0x%x, rx_tail=0x%x, max_off=0x%x\n",
-		    ZYNQ_INST(zchan), zchan->zchan_num,
-		    zvideo->index, __FUNCTION__,
-		    rx_head, rx_tail, zchan_rx->zchan_rx_size - 1);
+	if (rx_off == rx_tail) {
+		zynq_err("%d vid%d ch%d %s: no data to receive, "
+		    "rx_head=0x%x, rx_tail=0x%x\n",
+		    ZYNQ_INST(zchan), zvideo->index, zchan->zchan_num,
+		    __FUNCTION__, zchan_rx->zchan_rx_head, hw_tail);
 		return;
 	}
 
 	zvideo_get_timestamp(&zvideo->tv_intr);
 
 	zynq_trace(ZYNQ_TRACE_PROBE,
-	    "%d ch%d vid%d %s: rx_head=0x%x, rx_tail=0x%x\n",
+	    "%d ch%d vid%d %s: begin, rx_head=0x%x, rx_tail=0x%x\n",
 	    ZYNQ_INST(zchan), zchan->zchan_num, zvideo->index, __FUNCTION__,
-	    rx_head, rx_tail);
+	    zchan_rx->zchan_rx_head, hw_tail);
 
 	do {
 		buf = NULL;
@@ -2137,10 +2163,10 @@ next:
 		zchan_rx->zchan_rx_head = rx_off;
 		zchan_reg_write(zchan, ZYNQ_CH_RX_HEAD, rx_off);
 
-		zynq_trace(ZYNQ_TRACE_PROBE, "%d ch%d vid%d %s: "
-		    "size=0x%lx, rx_off=0x%x, rx_tail=0x%x\n",
+		zynq_trace(ZYNQ_TRACE_PROBE, "%d ch%d vid%d %s: frame end, "
+		    "size=0x%lx, rx_head=0x%x, rx_tail=0x%x\n",
 		    ZYNQ_INST(zchan), zchan->zchan_num, zvideo->index,
-		    __FUNCTION__, size, rx_off, rx_tail);
+		    __FUNCTION__, size, zchan_rx->zchan_rx_head, hw_tail);
 
 		if (buf != NULL) {
 			if (zvideo_check_meta_data(zvideo, buf)) {
@@ -2175,7 +2201,9 @@ static void zvideo_rx_proc_zero_copy(zynq_video_t *zvideo)
 	zchan_rx_tbl_t *zchan_rx = &zchan->zchan_rx_tbl;
 	zynq_video_buffer_t *buf, *cur, *next;
 	struct vb2_buffer *vb;
-	u32 rx_tail, rx_off;
+	u32 hw_tail;
+	u32 rx_tail;
+	u32 rx_off;
 	unsigned long memsz;
 	unsigned long size, len = 0;
 	void *data_phy = NULL;
@@ -2189,14 +2217,15 @@ static void zvideo_rx_proc_zero_copy(zynq_video_t *zvideo)
 
 	ASSERT(zchan_rx->zchan_rx_head ==
 	    zchan_reg_read(zchan, ZYNQ_CH_RX_HEAD));
-	rx_tail = zchan_reg_read(zchan, ZYNQ_CH_RX_TAIL);
+	hw_tail = zchan_reg_read(zchan, ZYNQ_CH_RX_TAIL);
+	rx_tail = hw_tail & ~(PAGE_SIZE - 1);
 
 	if (ZCHAN_RX_USED_SIZE(zchan_rx, zchan_rx->zchan_rx_head, rx_tail) %
 	    ALIGN(zvideo->format.sizeimage, zchan_rx->zchan_rx_bufsz)) {
 		zynq_err("%d vid%d ch%d %s: index check failed, "
 		    "rx_head=0x%x, rx_tail=0x%x\n",
 		    ZYNQ_INST(zchan), zvideo->index, zchan->zchan_num,
-		    __FUNCTION__, zchan_rx->zchan_rx_head, rx_tail);
+		    __FUNCTION__, zchan_rx->zchan_rx_head, hw_tail);
 		return;
 	}
 
@@ -2205,7 +2234,7 @@ static void zvideo_rx_proc_zero_copy(zynq_video_t *zvideo)
 		zynq_err("%d vid%d ch%d %s: no data to receive, "
 		    "rx_head=0x%x, rx_tail=0x%x, rx_off=0x%x\n",
 		    ZYNQ_INST(zchan), zvideo->index, zchan->zchan_num,
-		    __FUNCTION__, zchan_rx->zchan_rx_head, rx_tail, rx_off);
+		    __FUNCTION__, zchan_rx->zchan_rx_head, hw_tail, rx_off);
 		return;
 	}
 
@@ -2214,7 +2243,7 @@ static void zvideo_rx_proc_zero_copy(zynq_video_t *zvideo)
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d ch%d %s: begin, "
 	    "rx_head=0x%x, rx_tail=0x%x, rx_off=0x%x\n",
 	    ZYNQ_INST(zchan), zvideo->index, zchan->zchan_num, __FUNCTION__,
-	    zchan_rx->zchan_rx_head, rx_tail, rx_off);
+	    zchan_rx->zchan_rx_head, hw_tail, rx_off);
 
 	do {
 		buf = NULL;
@@ -2237,14 +2266,7 @@ static void zvideo_rx_proc_zero_copy(zynq_video_t *zvideo)
 		}
 		spin_unlock(&zvideo->qlock);
 
-		ASSERT(buf != NULL);
 		if (buf == NULL) {
-			/*
-			 * This is not supposed to happen during streaming.
-			 * The hardware should not issue the interrupt
-			 * when there's no bound DMA buffer to receive
-			 * the video data.
-			 */
 			ZYNQ_STATS_LOGX(zvideo,
 			    VIDEO_STATS_NO_VIDEO_BUF, 1, 0);
 			return;
@@ -2299,7 +2321,7 @@ static void zvideo_rx_proc_zero_copy(zynq_video_t *zvideo)
 			    ZYNQ_INST(zchan), zvideo->index,
 			    zchan->zchan_num, __FUNCTION__,
 			    zvideo->format.sizeimage, size, memsz,
-			    zchan_rx->zchan_rx_head, rx_tail, rx_off);
+			    zchan_rx->zchan_rx_head, hw_tail, rx_off);
 			rx_off += memsz;
 		}
 
@@ -2340,10 +2362,10 @@ static void zvideo_rx_proc_zero_copy(zynq_video_t *zvideo)
 		 */
 		zchan_rx->zchan_rx_off = rx_off;
 
-		zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d ch%d %s: end, "
+		zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d ch%d %s: frame end, "
 		    "rx_head=0x%x, rx_tail=0x%x, rx_off=0x%x, size=0x%lx\n",
 		    ZYNQ_INST(zchan), zvideo->index, zchan->zchan_num,
-		    __FUNCTION__, zchan_rx->zchan_rx_head, rx_tail, rx_off, size);
+		    __FUNCTION__, zchan_rx->zchan_rx_head, hw_tail, rx_off, size);
 
 		zvideo->sequence++;
 
@@ -2380,12 +2402,8 @@ void zvideo_err_proc(zynq_video_t *zvideo, int ch_err_status)
 		ZYNQ_STATS_LOG(zvideo, VIDEO_STATS_DMA_RX_BUF_FULL);
 	}
 
-	if (ch_err_status & ZYNQ_CH_ERR_CAM_FPD_UNLOCK) {
-		ZYNQ_STATS_LOG(zvideo, VIDEO_STATS_FPD_LINK_UNLOCK);
-	}
-
-	if (ch_err_status & ZYNQ_CH_ERR_CAM_FIFO_FULL) {
-		ZYNQ_STATS_LOG(zvideo, VIDEO_STATS_FIFO_FULL);
+	if (ch_err_status & ZYNQ_CH_ERR_DMA_RX_FIFO_FULL) {
+		ZYNQ_STATS_LOG(zvideo, VIDEO_STATS_DMA_RX_FIFO_FULL);
 	}
 }
 
