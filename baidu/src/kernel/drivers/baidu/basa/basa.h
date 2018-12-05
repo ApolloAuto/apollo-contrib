@@ -109,9 +109,13 @@ typedef struct zynq_dev {
 	int			zdev_msix_num;
 	struct msix_entry	*zdev_msixp;
 	struct tasklet_struct	zdev_ta[ZYNQ_INT_PER_CARD];
+
 	struct completion	zdev_gpspps_event_comp;
+	struct timespec		zdev_gps_ts_first;
 	struct timespec		zdev_gps_ts;	/* last valid GPS timestamp */
 	unsigned int		zdev_gps_smoothing;
+	unsigned int		zdev_gps_cnt;
+	long			zdev_sys_drift;
 
 	/* channels */
 	zynq_chan_t		*zdev_chans;
