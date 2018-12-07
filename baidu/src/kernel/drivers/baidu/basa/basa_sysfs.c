@@ -983,6 +983,27 @@ static ssize_t zynq_sysfs_stats_show(zynq_dev_t *zdev, char *buf)
 
 	len += sprintf(buf + len, "General:\n");
 	len += zynq_sysfs_list_stats(buf + len, zdev->stats, DEV_STATS_NUM);
+	if (zynq_trace_param & ZYNQ_TRACE_GPS) {
+		long drift = 0;
+		long period = zdev->zdev_gps_ts.tv_sec -
+		    zdev->zdev_gps_ts_first.tv_sec;
+		if (period > 0) {
+			long total = zdev->zdev_sys_drift;
+			if (total < 0) {
+				total = -total;
+			}
+			drift = total / period;
+			if ((total - (drift * period)) >
+			    ((drift + 1) * period - total)) {
+				drift++;
+			}
+			if (zdev->zdev_sys_drift < 0) {
+				drift = -drift;
+			}
+		}
+		len += sprintf(buf + len, "%*c%s%*c %7ld\n",
+		    INDENT, ' ', "SYS time drift", ALIGNMENT - 14, ' ', drift);
+	}
 
 	/* Print CAN channel statistics */
 	len += sprintf(buf + len, "\nCAN Channels:%*c",

@@ -147,26 +147,36 @@ static void zynq_gps_time_ts(u32 *gps_val, struct timespec *ts)
 static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
 {
 	u32 gps_val[3];
-	struct timespec ts_now;
+	struct timespec ts_sys;
 	int diff;
 	int delay;
 	int thresh;
 
-	ktime_get_real_ts(&ts_now);
-
-	if (zynq_get_gps_time(zdev, gps_val)) {
-		return -1;
+	if (zdev->zdev_gps_cnt & 0x1) {
+		ktime_get_real_ts(&ts_sys);
+		if (zynq_get_gps_time(zdev, gps_val)) {
+			return -1;
+		}
+	} else {
+		if (zynq_get_gps_time(zdev, gps_val)) {
+			return -1;
+		}
+		ktime_get_real_ts(&ts_sys);
 	}
 
 	zynq_gps_time_ts(gps_val, ts);
 
 	/* check the gap between system time and gps time in usec */
-	diff = (ts->tv_sec - ts_now.tv_sec) * USEC_PER_SEC +
-	    (ts->tv_nsec - ts_now.tv_nsec) / NSEC_PER_USEC;
+	diff = (ts_sys.tv_sec - ts->tv_sec) * USEC_PER_SEC +
+	    (ts_sys.tv_nsec - ts->tv_nsec) / NSEC_PER_USEC;
+
+	if (zdev->zdev_gps_ts_first.tv_sec) {
+		zdev->zdev_sys_drift += diff;
+	}
 
 	zynq_trace(ZYNQ_TRACE_GPS,
 	    "%d SYS time: %ld.%09ld, %s time: %ld.%09ld, %dus\n",
-	    zdev->zdev_inst, ts_now.tv_sec, ts_now.tv_nsec,
+	    zdev->zdev_inst, ts_sys.tv_sec, ts_sys.tv_nsec,
 	    (gps_val[0] & ZYNQ_GPS_TIME_VALID) ? "GPS" : "FPGA",
 	    ts->tv_sec, ts->tv_nsec, diff);
 
@@ -195,7 +205,7 @@ static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
 	if (delay < 0) {
 		zynq_err("%d WARNING! SYS time: %ld.%09ld, %s time: %ld.%09ld, "
 		    "Last sync time: %ld.%09ld, abnormal time jump.\n",
-		    zdev->zdev_inst, ts_now.tv_sec, ts_now.tv_nsec,
+		    zdev->zdev_inst, ts_sys.tv_sec, ts_sys.tv_nsec,
 		    (gps_val[0] & ZYNQ_GPS_TIME_VALID) ? "GPS" : "FPGA",
 		    ts->tv_sec, ts->tv_nsec,
 		    zdev->zdev_gps_ts.tv_sec, zdev->zdev_gps_ts.tv_nsec);
@@ -207,7 +217,7 @@ static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
 	if ((diff > thresh) || (diff < -thresh)) {
 		zynq_err("%d WARNING! SYS time: %ld.%09ld, %s time: %ld.%09ld, "
 		    "gap %dus exceeds high threshold %dus.\n",
-		    zdev->zdev_inst, ts_now.tv_sec, ts_now.tv_nsec,
+		    zdev->zdev_inst, ts_sys.tv_sec, ts_sys.tv_nsec,
 		    (gps_val[0] & ZYNQ_GPS_TIME_VALID) ? "GPS" : "FPGA",
 		    ts->tv_sec, ts->tv_nsec, diff, thresh);
 		return 0;
@@ -218,7 +228,7 @@ static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
 	if ((diff > thresh) || (diff < -thresh)) {
 		zynq_err("%d WARNING! SYS time: %ld.%09ld, %s time: %ld.%09ld, "
 		    "gap %dus exceeds low threshold %dus.\n",
-		    zdev->zdev_inst, ts_now.tv_sec, ts_now.tv_nsec,
+		    zdev->zdev_inst, ts_sys.tv_sec, ts_sys.tv_nsec,
 		    (gps_val[0] & ZYNQ_GPS_TIME_VALID) ? "GPS" : "FPGA",
 		    ts->tv_sec, ts->tv_nsec, diff, thresh);
 	}
@@ -243,7 +253,11 @@ static int zynq_do_gps_sync(zynq_dev_t *zdev)
 		return ret;
 	}
 
+	if (!zdev->zdev_gps_ts_first.tv_sec) {
+		zdev->zdev_gps_ts_first = ts;
+	}
 	zdev->zdev_gps_ts = ts;
+	zdev->zdev_gps_cnt++;
 
 	return 0;
 }
@@ -287,8 +301,11 @@ static int zynq_gps_sync_thread(void *arg)
 			status = zynq_g_reg_read(zdev, ZYNQ_G_GPS_STATUS);
 			zynq_trace(ZYNQ_TRACE_PROBE, "%d %s: gps_status=0x%x\n",
 			    zdev->zdev_inst, __FUNCTION__, status);
-			zdev->zdev_gps_smoothing =
-			    status & ZYNQ_GPS_SMOOTH_IN_PROGRESS;
+			if (status & ZYNQ_GPS_SMOOTH_IN_PROGRESS) {
+				zdev->zdev_gps_smoothing = 2;
+			} else if (zdev->zdev_gps_smoothing) {
+				zdev->zdev_gps_smoothing--;
+			}
 			spin_unlock(&zdev->zdev_lock);
 		}
 		if (result > 0) {
@@ -429,6 +446,18 @@ static void zynq_gps_config(zynq_dev_t *zdev)
 	spin_unlock(&zdev->zdev_lock);
 }
 
+static u32 zynq_gps_status(zynq_dev_t *zdev)
+{
+	u32 status;
+
+	status = zynq_g_reg_read(zdev, ZYNQ_G_STATUS);
+	zynq_log("%d PPS is %s, GPS %s locked\n", zdev->zdev_inst,
+	    (status & ZYNQ_STATUS_PPS_LOCKED) ? "ON" : "OFF",
+	    (status & ZYNQ_STATUS_GPS_LOCKED) ? "is" : "is NOT");
+
+	return status;
+}
+
 void zynq_gps_init(zynq_dev_t *zdev)
 {
 	if (zynq_fwupdate_param) {
@@ -447,6 +476,8 @@ void zynq_gps_init(zynq_dev_t *zdev)
 	spin_unlock(&zynq_gps_lock);
 
 	zynq_gps_config(zdev);
+
+	zynq_gps_status(zdev);
 
 	zynq_gps_thread_init(zdev);
 }
@@ -471,11 +502,7 @@ void zynq_gps_pps_changed(zynq_dev_t *zdev)
 	/* notify the waiting thread */
 	complete(&zdev->zdev_gpspps_event_comp);
 
-	status = zynq_g_reg_read(zdev, ZYNQ_G_STATUS);
-	zynq_log("%d %s: PPS is %s, GPS %s locked\n",
-	    zdev->zdev_inst, __FUNCTION__,
-	    (status & ZYNQ_STATUS_PPS_LOCKED) ? "ON" : "OFF",
-	    (status & ZYNQ_STATUS_GPS_LOCKED) ? "is" : "is NOT");
+	status = zynq_gps_status(zdev);
 
 	if (!(status & ZYNQ_STATUS_GPS_LOCKED)) {
 		ZYNQ_STATS_LOGX(zdev, DEV_STATS_GPS_UNLOCK, 1, 0);
