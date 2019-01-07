@@ -1,13 +1,5 @@
-# Copyright 2018 Baidu Inc. All Rights Reserved.
-# Author: Lei Fang (fanglei01@baidu.com)
-#
-# cmakelists
-
 cmake_minimum_required(VERSION 2.8)
 
-#######
-#proto#
-#######
 function(V2X_PROTOBUF_GENERATE_CPP PATH SRCS HDRS)
     if(NOT ARGN)
         message(SEND_ERROR "Error: V2X_PROTOBUF_GENERATE_CPP() called without any proto files")
@@ -126,7 +118,4 @@ function(V2X_PROTOBUF_GENERATE_GRPC_CPP PATH SRCS HDRS)
     set(${SRCS} ${${SRCS}} PARENT_SCOPE)
     set(${HDRS} ${${HDRS}} PARENT_SCOPE)
 endfunction()
-
-
-
 

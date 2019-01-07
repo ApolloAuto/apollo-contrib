@@ -1,8 +1,3 @@
-# Copyright 2018 Baidu Inc. All Rights Reserved.
-# Author: Lei Fang (fanglei01@baidu.com)
-#
-# cmakelists
-
 cmake_minimum_required(VERSION 2.8)
 
 #find_package(Protobuf REQUIRED)
