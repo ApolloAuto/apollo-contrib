@@ -1,0 +1,58 @@
+syntax = "proto2";
+
+package apollo.localization;
+
+import "header.proto";
+import "pose.proto";
+import "geometry.proto";
+import "pnc_point.proto";
+
+message Uncertainty {
+  // Standard deviation of position, east/north/up in meters.
+  optional apollo.common.Point3D position_std_dev = 1;
+
+  // Standard deviation of quaternion qx/qy/qz, unitless.
+  optional apollo.common.Point3D orientation_std_dev = 2;
+
+  // Standard deviation of linear velocity, east/north/up in meters per second.
+  optional apollo.common.Point3D linear_velocity_std_dev = 3;
+
+  // Standard deviation of linear acceleration, right/forward/up in meters per
+  // square second.
+  optional apollo.common.Point3D linear_acceleration_std_dev = 4;
+
+  // Standard deviation of angular velocity, right/forward/up in radians per
+  // second.
+  optional apollo.common.Point3D angular_velocity_std_dev = 5;
+
+  // TODO: Define covariance items when needed.
+}
+
+message LocalizationEstimate {
+  optional apollo.common.Header header = 1;
+  optional apollo.localization.Pose pose = 2;
+  optional Uncertainty uncertainty = 3;
+
+  // The time of pose measurement, seconds since the GPS epoch (Jan 6, 1980).
+  optional double measurement_time = 4;  // In seconds.
+
+  // Future trajectory acturally driven by the drivers
+  repeated apollo.common.TrajectoryPoint trajectory_point = 5;
+}
+
+enum MeasureState {
+  NOT_VALID = 0;
+  NOT_STABLE = 1;
+  OK = 2;
+  VALID = 3;
+}
+
+message LocalizationStatus {
+  optional apollo.common.Header header = 1;
+  optional MeasureState fusion_status = 2;
+  optional MeasureState gnss_status = 3;
+  optional MeasureState lidar_status = 4;
+
+  // The time of pose measurement, seconds since the GPS epoch (Jan 6, 1980).
+  optional double measurement_time = 5;  // In seconds.
+}

@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 2.8)
+
+add_subdirectory(database)
+add_subdirectory(proto)
+add_subdirectory(network_adapter)
+add_subdirectory(scenario)
+add_subdirectory(proxy)
+add_subdirectory(msg_sets)
+add_subdirectory(policies)
+add_subdirectory(platform_auth)
