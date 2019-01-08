@@ -1,0 +1,20 @@
+--obu_ip_addr=192.168.10.6
+--ipc_ip_addr=192.168.10.6
+
+# security feature enable flag
+--security_flag=false
+--root_ca=
+--self_ca=
+
+# authentication parameters for uu interface mode
+--auth_url=http://192.168.1.1:8000/v2x-auth/v1/auth
+--uu_server_addr=192.168.1.1
+--uu_socket_port=10000
+--uu_device_id=00000000000000
+--uu_device_mac=00000000000000
+--uu_message_interval_in_ms=1000
+--uu_debug=true
+# coordination convert
+--zone=50
+--southernhemi_flag=false
+--debug_flag=true
