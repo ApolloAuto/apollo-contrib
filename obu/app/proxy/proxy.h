@@ -50,8 +50,6 @@ namespace v2x {
 
 class V2xProxy {
  public:
-  typedef SingletonService<V2xProxy> V2xProxySingleton;
-
   V2xProxy(const std::string& rsu_or_obu_address,
            const std::string& svb_address)
       : service_(rsu_or_obu_address), client_(svb_address) {}

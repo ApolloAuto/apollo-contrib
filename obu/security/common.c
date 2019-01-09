@@ -263,6 +263,8 @@ EC_KEY *GetPubKey(uint8_t *ca_buf, int ca_len, EC_KEY *root_key) {
   ToBeSigned_t *tbs = NULL;
   EC_KEY *self_key = NULL;
   asn_enc_rval_t ret;
+  BIGNUM *y = NULL;
+  BIGNUM *z = NULL;
 
   if (ca_buf == NULL || root_key == NULL) {
     printf("Parameters error\n");
@@ -296,8 +298,6 @@ EC_KEY *GetPubKey(uint8_t *ca_buf, int ca_len, EC_KEY *root_key) {
   }
 
   // Setup eckey
-  BIGNUM *y = NULL;
-  BIGNUM *z = NULL;
   y = BN_new();
   z = BN_new();
 
