@@ -600,6 +600,8 @@ typedef struct ioc_zynq_stats {
 /* AR0231, register group 0x2020 - 0x2050 */
 #define	EM_REG_OFFSET_BASE2_231		0x0074
 #define	EM_REG_OFFSET_EXP_T1_ROW_231	0x007C	/* Register 0x2020 */
+#define EM_REG_OFFSET_EXP_T2_ROW_231    0x0084  /* Register 0x2028 */
+#define EM_REG_OFFSET_EXP_T3_ROW_231    0x008C  /* Register 0x2030 */
 #define	EM_REG_OFFSET_EXP_T1_CLK_HI_231	0x009C	/* Register 0x2028 */
 #define	EM_REG_OFFSET_EXP_T1_CLK_LO_231	0x00A4	/* Register 0x202A */
 
