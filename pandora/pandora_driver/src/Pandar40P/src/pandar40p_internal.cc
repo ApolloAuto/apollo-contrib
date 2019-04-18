@@ -14,7 +14,6 @@
  * limitations under the License.
  *****************************************************************************/
 
-#include <algorithm>
 #include <sstream>
 
 #include "src/input.h"
@@ -38,7 +37,7 @@ static const float pandar40p_elev_angle_map[] = {
     -4.321, -4.657, -4.986,  -5.311,  -5.647,  -5.974, -6.957,  -7.934,
     -8.908, -9.871, -10.826, -11.772, -12.705, -13.63, -14.543, -15.444};
 
-// Line 40 Lidar azimuth Horizontal offset ,  Line 1 - Line 40
+// Line 40 Lidar azimuth Horizatal offset ,  Line 1 - Line 40
 static const float pandar40p_horizatal_azimuth_offset_map[] = {
     0.005,  0.006,  0.006,  0.006,  -2.479, -2.479, 2.491,  -4.953,
     -2.479, 2.492,  -4.953, -2.479, 2.492,  -4.953, 0.007,  2.491,
@@ -47,7 +46,7 @@ static const float pandar40p_horizatal_azimuth_offset_map[] = {
     0.004,  0.004,  0.003,  0.003,  -2.466, -2.463, -2.46,  -2.457};
 
 Pandar40P_Internal::Pandar40P_Internal(
-    const std::string &device_ip, uint16_t lidar_port, uint16_t gps_port,
+    std::string device_ip, uint16_t lidar_port, uint16_t gps_port,
     boost::function<void(boost::shared_ptr<PPointCloud>, double)> pcl_callback,
     boost::function<void(double)> gps_callback, uint16_t start_angle, int tz,
     std::string frame_id) {
@@ -60,7 +59,7 @@ Pandar40P_Internal::Pandar40P_Internal(
   enable_lidar_recv_thr_ = false;
   enable_lidar_process_thr_ = false;
 
-  start_angle_ = start_angle > 36000 ? 0 : start_angle;
+  start_angle_ = start_angle;
 
   for (uint16_t rotIndex = 0; rotIndex < ROTATION_MAX_UNITS; ++rotIndex) {
     float rotation = degreeToRadian(0.01 * static_cast<double>(rotIndex));
@@ -72,6 +71,8 @@ Pandar40P_Internal::Pandar40P_Internal(
 
   pcl_callback_ = pcl_callback;
   gps_callback_ = gps_callback;
+
+  last_azimuth_ = 0;
 
   // init the block time offset, us
   blockOffset_[9] = 55.1f * 0.0 + 45.18f;
@@ -148,7 +149,7 @@ Pandar40P_Internal::~Pandar40P_Internal() {
  * @brief load the correction file
  * @param file The path of correction file
  */
-int Pandar40P_Internal::LoadCorrectionFile(const std::string &correction_content) {  // NOLINT
+int Pandar40P_Internal::LoadCorrectionFile(std::string correction_content) {
   std::istringstream ifs(correction_content);
 
   std::string line;
@@ -193,7 +194,7 @@ int Pandar40P_Internal::LoadCorrectionFile(const std::string &correction_content
 }
 
 /**
- * @brief reset the start angle
+ * @brief load the correction file
  * @param angle The start angle
  */
 void Pandar40P_Internal::ResetStartAngle(uint16_t start_angle) {
@@ -251,9 +252,9 @@ void Pandar40P_Internal::RecvTask() {
 }
 
 void Pandar40P_Internal::ProcessLiarPacket() {
+  double lastTimestamp = 0.0f;
   struct timespec ts;
   int ret = 0;
-  static int packetIndex = 0;
 
   boost::shared_ptr<PPointCloud> outMsg(new PPointCloud());
 
@@ -279,31 +280,29 @@ void Pandar40P_Internal::ProcessLiarPacket() {
         continue;
       }
 
-      packetIndex++;
-
       for (int i = 0; i < BLOCKS_PER_PACKET; ++i) {
-        /* ready a round ? */
-        uint16_t current_azimuth = pkt.blocks[i].azimuth;
-        int limit_degree = RATE_PER_PACKET * 100/2;
-        int gap = std::min(std::abs(current_azimuth - start_angle_),
-                36000 - std::abs(current_azimuth - start_angle_));
-
-        // at lease 150 packets, no more than 182
-        if ((packetIndex > PACKETS_PER_ROUND * 5/6 && gap <= limit_degree) ||
-                packetIndex > PACKETS_PER_ROUND + 1) {
-          // ok
-          if (pcl_callback_ && outMsg->points.size() > 0) {
-            // std::cout << std::fixed << std::setprecision(18)
-            //    << "Size: " << packetIndex << ", current: " << current_azimuth
-            //    << ", timestamp_: " << timestamp_ << std::endl;
-            pcl_callback_(outMsg, timestamp_);
-            outMsg.reset(new PPointCloud());
-            // reset
-            packetIndex = 0; timestamp_ = 0;
+        int azimuthGap = 0; /* To do */
+        if(last_azimuth_ > pkt.blocks[i].azimuth) {
+          azimuthGap = static_cast<int>(pkt.blocks[i].azimuth) + (36000 - static_cast<int>(last_azimuth_));
+        } else {
+          azimuthGap = static_cast<int>(pkt.blocks[i].azimuth) - static_cast<int>(last_azimuth_);
+        }
+        
+        if (last_azimuth_ != pkt.blocks[i].azimuth && 
+                      azimuthGap < 600 /* 6 degree*/) {
+          /* for all the blocks */
+          if ((last_azimuth_ > pkt.blocks[i].azimuth &&
+               start_angle_ <= pkt.blocks[i].azimuth) ||
+              (last_azimuth_ < start_angle_ &&
+               start_angle_ <= pkt.blocks[i].azimuth)) {
+            if (pcl_callback_ && outMsg->points.size() > 0) {
+              pcl_callback_(outMsg, outMsg->points[0].timestamp);
+              outMsg.reset(new PPointCloud());
+            }
           }
         }
-
         CalcPointXYZIT(&pkt, i, outMsg);
+        last_azimuth_ = pkt.blocks[i].azimuth;
       }
     } else {
       continue;
@@ -331,13 +330,13 @@ void Pandar40P_Internal::ProcessGps(const PandarGPS &gpsMsg) {
 
   // UTC's month start from 1, but mktime only accept month from 0.
   t.tm_mon = gpsMsg.month - 1;
-  // UTC's year only include 0 - 99 year , which indicates 2000 to 2099.
-  // and mktime's year start from 1900 which is 0, so we need to add 100 years.
+  // UTC's year only include 0 - 99 year , which indicate 2000 to 2099.
+  // and mktime's year start from 1900 which is 0. so we need add 100 year.
   t.tm_year = gpsMsg.year + 100;
   t.tm_isdst = 0;
 
   if (gps_callback_) {
-    gps_callback_(static_cast<double>(mktime(&t) + tz_second_) + 1);
+    gps_callback_(static_cast<double>(mktime(&t) + tz_second_));
   }
 }
 
@@ -393,7 +392,7 @@ int Pandar40P_Internal::ParseRawData(Pandar40PPacket *packet,
   // parse the UTC Time.
 
   // UTC's year only include 0 - 99 year , which indicate 2000 to 2099.
-  // and mktime's year start from 1900 which is 0, so we need to add 100 years.
+  // and mktime's year start from 1900 which is 0. so we need add 100 year.
   packet->t.tm_year = (buf[index + 0] & 0xff) + 100;
   // UTC's month start from 1, but mktime only accept month from 0.
   packet->t.tm_mon = (buf[index + 1] & 0xff) - 1;
@@ -458,7 +457,7 @@ void Pandar40P_Internal::CalcPointXYZIT(Pandar40PPacket *pkt, int blockid,
   Pandar40PBlock *block = &pkt->blocks[blockid];
 
   double unix_second =
-      static_cast<double>(mktime(&pkt->t) + 1 + tz_second_);  // 1 second offset
+      static_cast<double>(mktime(&pkt->t) + tz_second_);
 
   for (int i = 0; i < LASER_COUNT; ++i) {
     /* for all the units in a block */
@@ -499,7 +498,7 @@ void Pandar40P_Internal::CalcPointXYZIT(Pandar40PPacket *pkt, int blockid,
       // dual return, block 0&1 (2&3 , 4*5 ...)'s timestamp is the same.
       point.timestamp =
           point.timestamp - (static_cast<double>(blockOffset_[blockid / 2] +
-                                                 laserOffset_[i / 2]) /
+                                                 laserOffset_[i]) /
                              1000000.0f);
     } else {
       point.timestamp =
@@ -509,11 +508,6 @@ void Pandar40P_Internal::CalcPointXYZIT(Pandar40PPacket *pkt, int blockid,
     }
 
     point.ring = i;
-    // get smallest timestamp
-    if ((timestamp_ > 0 && timestamp_ < point.timestamp)
-            || timestamp_ <= 0) {
-      timestamp_ = point.timestamp;
-    }
 
     cld->push_back(point);
   }

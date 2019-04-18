@@ -18,7 +18,6 @@
 #define SRC_INPUT_H_
 
 #include <netinet/in.h>
-#include <pcap.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string>
@@ -39,9 +38,8 @@ class Input {
  public:
   Input(uint16_t port, uint16_t gpsPort);
   ~Input();
-  Input(std::string filePath, int type);  // not implemented
+  Input(std::string filePath, int type);
   int getPacket(PandarPacket *pkt);
-  int getPacketFromPcap(PandarPacket *pkt);  // not implemented
 
  private:
   int socketForLidar;

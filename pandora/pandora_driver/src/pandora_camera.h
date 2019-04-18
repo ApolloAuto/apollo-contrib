@@ -17,8 +17,6 @@
 #ifndef SRC_PANDORA_CAMERA_H_
 #define SRC_PANDORA_CAMERA_H_
 
-#include <boost/function.hpp>
-#include <opencv2/opencv.hpp>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pthread.h>
@@ -27,6 +25,9 @@
 #include <list>
 #include <string>
 #include <vector>
+
+#include <boost/function.hpp>
+#include <opencv2/opencv.hpp>
 
 #include "src/pandora_client.h"
 
@@ -50,7 +51,7 @@ class PandoraCamera {
    *        type       				The device type
    */
   PandoraCamera(
-      const std::string &device_ip, const uint16_t pandoraCameraPort,
+      std::string device_ip, const uint16_t pandoraCameraPort,
       boost::function<void(boost::shared_ptr<cv::Mat> matp, double timestamp,
                            int picid, bool distortion)>
           camera_callback,
@@ -62,15 +63,15 @@ class PandoraCamera {
    * @param angle The start angle
    */
 
-  bool loadIntrinsics(const std::vector<cv::Mat> &cameras_k,
-                      const std::vector<cv::Mat> &cameras_d);
+  bool loadIntrinsics(const std::vector<cv::Mat> cameras_k,
+                      const std::vector<cv::Mat> cameras_d);
 
   int Start();
   void Stop();
   void pushPicture(PandoraPic *pic);
 
  private:
-  void processPic();
+  void processPic(int pic_id);
 
   int decompressJpeg(uint8_t *jpgBuffer, const uint32_t jpgSize, uint8_t **bmp,
                      uint32_t *bmpSize);
@@ -81,15 +82,15 @@ class PandoraCamera {
   void yuvToRgb(const int iY, const int iU, const int iV, int *iR, int *iG,
                 int *iB);
 
-  pthread_mutex_t pic_lock_;
-  sem_t pic_sem_;
-  boost::thread *process_pic_thread_;
+  pthread_mutex_t pic_lock_[CAMERA_NUM];
+  sem_t pic_sem_[CAMERA_NUM];
+  boost::thread *process_pic_thread_[CAMERA_NUM];
   bool continue_process_pic_;
   bool need_remap_;
   std::string ip_;
   uint16_t camera_port_;
   void *pandora_client_;
-  std::list<PandoraPic *> pic_list_;
+  std::list<PandoraPic *> pic_list_[CAMERA_NUM];
   std::vector<cv::Mat> mapx_;
   std::vector<cv::Mat> mapy_;
   boost::function<void(boost::shared_ptr<cv::Mat> matp, double timestamp,
