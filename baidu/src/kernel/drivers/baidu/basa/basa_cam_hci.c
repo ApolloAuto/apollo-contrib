@@ -394,6 +394,9 @@ static void zcam_read_embedded_data_231(zynq_video_t *zvideo, void *buf)
 	unsigned int frame_count = 0;
 	unsigned int t1_clk = 0;
 	unsigned int t1_row = 0;
+	unsigned int t2_row = 0;
+	unsigned int t3_row = 0;
+	unsigned int t_tot = 0;
 	unsigned int line_pck = 0;
 
 	if (EM_REG_VAL_231(buf, BASE1) == EM_REG_FRAME_CNT_HI) {
@@ -404,19 +407,23 @@ static void zcam_read_embedded_data_231(zynq_video_t *zvideo, void *buf)
 
 	if (EM_REG_VAL_231(buf, BASE2) == EM_REG_EXP_T1_ROW) {
 		t1_row = EM_REG_VAL_231(buf, EXP_T1_ROW);
+		t2_row = EM_REG_VAL_231(buf, EXP_T2_ROW);
+		t3_row = EM_REG_VAL_231(buf, EXP_T3_ROW);
 		t1_clk = (EM_REG_VAL_231(buf, EXP_T1_CLK_HI) << 16) |
 		    EM_REG_VAL_231(buf, EXP_T1_CLK_LO);
 		line_pck = t1_clk / t1_row;
-		zvideo->last_exp_time = T_FRAME(t1_row,
+		t_tot = t1_row + t2_row + t3_row + 3;
+		zvideo->last_exp_time = T_FRAME(t_tot,
 		    zvideo->caps.line_len_pck, zvideo->caps.pixel_clock);
 	}
 
 	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: "
-	    "sequence=%u, frame_count=%u, t1_row=%u, t1_clk=%u, "
-	    "line_pck=%u, exposure_time=%uus\n",
-	    zdev->zdev_inst, zvideo->index, __FUNCTION__,
-	    zvideo->sequence, frame_count, t1_row, t1_clk, line_pck,
-	    zvideo->last_exp_time);
+			"sequence=%u, frame_count=%u, t1_row=%u, t2_row = %u, t3_row = %u, t_tot = %u, "
+			"t1_clk=%u, line_pck=%u, exposure_time=%uus\n",
+			zdev->zdev_inst, zvideo->index, __FUNCTION__,
+			zvideo->sequence, frame_count, t1_row, t2_row, t3_row, t_tot, t1_clk, line_pck,
+			zvideo->last_exp_time);
+
 }
 
 static int zcam_probe(zynq_video_t *zvideo)
