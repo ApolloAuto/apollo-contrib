@@ -25,7 +25,7 @@
 #define	PCI_DEVICE_ID_MOONROVER		0x2083
 
 #define	ZYNQ_DRV_NAME			"basa"
-#define	ZYNQ_MOD_VER			"3.0.0.4"
+#define	ZYNQ_MOD_VER			"3.0.0.5"
 
 /*
  * The system clock accuracy is within 30 ppm.
@@ -291,6 +291,8 @@
 #define	ZYNQ_GPS_TIME_MON_MASK		0xFF
 #define	ZYNQ_GPS_TIME_DAY_OFFSET	16
 #define	ZYNQ_GPS_TIME_DAY_MASK		0xFF
+#define ZYNQ_GPS_PPS_LOCK_DELAY_OFFSET 24
+#define ZYNQ_GPS_PPS_LOCK_DELAY_MASK 0x7F
 #define	ZYNQ_GPS_CHECKSUM_CHECK		(1 << 31)
 
 #define	ZYNQ_G_GPS_STATUS		0x2110
