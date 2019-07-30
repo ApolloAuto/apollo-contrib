@@ -86,6 +86,9 @@ static const char ts_label_fpga[] = "FPGA";
 
 static void zvideo_set_format(zynq_video_t *zvideo)
 {
+	zynq_dev_t *zdev = zvideo->zdev;
+	unsigned int val; 
+
 	zvideo->format = zvideo_formats[zynq_video_format];
 	zvideo->meta_header_lines = ZVIDEO_EM_DATA_LINES;
 	zvideo->meta_footer_lines = ZVIDEO_EM_STATS_LINES;
@@ -97,6 +100,15 @@ static void zvideo_set_format(zynq_video_t *zvideo)
 		zvideo->format.height = ZVIDEO_IMAGE_HEIGHT;
 		zvideo->format.sizeimage = zvideo->format.bytesperline *
 		    zvideo->format.height + ZVIDEO_EXT_META_DATA_BYTES;
+	} else {
+		spin_lock(&zdev->zdev_lock);
+		val = zynq_g_reg_read(zdev, ZYNQ_G_CAM_TRIG_CFG);
+		val &= ~(ZYNQ_G_CAM_FPS_DRIFT_MASK << ZYNQ_G_CAM_FPS_DRIFT_OFFSET);
+		val &= ~(ZYNQ_G_CAM_DELAY_UPDATE_MASK << ZYNQ_G_CAM_DELAY_UPDATE_OFFSET);
+		val = SET_BITS(ZYNQ_G_CAM_FPS_DRIFT, val, 2) | 
+			SET_BITS(ZYNQ_G_CAM_DELAY_UPDATE, val, 10); 
+		zynq_g_reg_write(zdev, ZYNQ_G_CAM_TRIG_CFG, val);
+		spin_unlock(&zdev->zdev_lock);
 	}
 }
 

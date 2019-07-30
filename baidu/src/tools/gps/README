@@ -1,0 +1,33 @@
+----------------
+baidu_gps_time -- Baidu GPS time get/set utility.
+----------------
+
+author: huangkun07@baidu.com
+date: 6/2016
+
+usage:
+
+0. This is working with ADU HW2.0, particularly with PP6+FPGA setup.
+
+1. Put a 5min crontab, as
+*/5 * * * * root date >> /var/log/gps_sync.log; baidu_gps_time -s >> /var/log/gps_sync.log 2>&1;
+for continuous adjustments of GPS time and host time drift. Expected << 1ms.
+
+2. Invoke baidu_gps_time -s before adv_trigger, so we have a GPS synced host time before triggering sensors, e.g. cameras;
+ 
+3. One can also run manually anytime as: (need root permission)
+set host time to gps time:
+baidu_gps_time -s  
+
+get gps time:
+baidu_gps_time -p
+
+get GPRMC msg from gps:
+baidu_gps_time -m
+
+for help:
+baidu_gps_time -h
+
+4. In case of gps not in locked status, the program retries 10 times (1 sec per try), and might give up;
+One can re-run it at later time.
+
