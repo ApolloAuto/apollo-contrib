@@ -383,7 +383,8 @@ static int zynq_gps_init_fpga_time(zynq_dev_t *zdev)
 	val = zynq_g_reg_read(zdev, ZYNQ_G_GPS_CONFIG_2);
 	val = SET_BITS(ZYNQ_GPS_TIME_DAY, val, t.tm_mday) |
 	    SET_BITS(ZYNQ_GPS_TIME_MON, val, t.tm_mon + 1) |
-	    SET_BITS(ZYNQ_GPS_TIME_YEAR, val, t.tm_year - 100);
+	    SET_BITS(ZYNQ_GPS_TIME_YEAR, val, t.tm_year - 100) |
+		SET_BITS(ZYNQ_GPS_PPS_LOCK_DELAY, val, 0x20);
 	zynq_g_reg_write(zdev, ZYNQ_G_GPS_CONFIG_2, val);
 
 	val = SET_BITS(ZYNQ_GPS_TIME_SEC, 0, t.tm_sec) |
@@ -442,6 +443,8 @@ static void zynq_gps_config(zynq_dev_t *zdev)
 	} else {
 		val &= ~ZYNQ_GPS_CHECKSUM_CHECK;
 	}
+	if (ZDEV_PL_VER(zdev) > 0x200)
+		val = val | SET_BITS(ZYNQ_GPS_PPS_LOCK_DELAY, val, 0x20);
 	zynq_g_reg_write(zdev, ZYNQ_G_GPS_CONFIG_2, val);
 	spin_unlock(&zdev->zdev_lock);
 }
