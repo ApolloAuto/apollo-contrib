@@ -72,7 +72,11 @@ static int zdev_enable_msi(zynq_dev_t *zdev)
 	 * due to an FPGA issue
 	 */
 msi_retry:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 	rc = pci_enable_msi_exact(zdev->zdev_pdev, max_nvec);
+#else
+    rc = pci_alloc_irq_vectors(zdev->zdev_pdev, max_nvec, max_nvec, PCI_IRQ_MSI);
+#endif
 	if (rc < 0) {
 		if (max_nvec == 1) {
 			zynq_trace(ZYNQ_TRACE_PROBE,
@@ -116,7 +120,11 @@ static int zdev_enable_msix(zynq_dev_t *zdev)
 	 *	2. One interrupt per device.
 	 */
 msix_retry:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	rc = pci_enable_msix(zdev->zdev_pdev, zdev->zdev_msixp, max_nvec);
+#else
+    rc = pci_enable_msix_range(zdev->zdev_pdev, zdev->zdev_msixp, max_nvec, max_nvec);
+#endif
 	if (rc < 0) {
 		zynq_trace(ZYNQ_TRACE_PROBE,
 		    "%s: failed to enable MSI-X nvec=%d\n",

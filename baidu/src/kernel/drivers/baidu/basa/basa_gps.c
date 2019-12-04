@@ -23,9 +23,14 @@
 #include <linux/time.h>
 #include <linux/hrtimer.h>
 #include <linux/kthread.h>
-#include <linux/sched.h>
 
 #include "basa.h"
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	#include <linux/sched.h>
+#else
+	#include <linux/sched/types.h>
+#endif
 
 static zynq_dev_t *zynq_gps_master_dev = NULL;
 static struct task_struct *zynq_gps_taskp = NULL;
