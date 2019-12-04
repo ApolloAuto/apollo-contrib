@@ -373,6 +373,10 @@ static int zvideo_check_meta_data(zynq_video_t *zvideo,
 	zynq_dev_t *zdev = zvideo->zdev;
 	zynq_video_ext_meta_data_t *ext;
 	struct timeval *tv;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+	struct timeval curTv={0, 0};
+	u64 *timeval_in_ns;
+#endif
 	const char *label;
 	unsigned char *mem;
 	unsigned long memsz;
@@ -474,8 +478,14 @@ static int zvideo_check_meta_data(zynq_video_t *zvideo,
 		}
 	}
 	zvideo->last_trig_cnt = trig_cnt;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
 	tv = &buf->vbuf.timestamp;
+#else
+	// To keep the original logic, all the following logic manipulates tv.
+	// convert it to timeval_in_ns at the end.
+	tv = &curTv;
+	timeval_in_ns = &buf->vbuf.vb2_buf.timestamp;
+#endif
 	switch (zynq_video_ts_type) {
 	default:
 	case CAM_CAP_TIMESTAMP_FPGA:
@@ -514,6 +524,10 @@ fpga_time:
 		label = ts_label_host;
 		break;
 	}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+	*timeval_in_ns = tv->tv_sec * 1000000000 + tv->tv_usec * 1000;
+#endif
 
 	buf->vbuf.sequence = zvideo->sequence;
 
@@ -934,6 +948,7 @@ init_rx_fail:
  * the min_buffers_needed before calling this function. Here we don't
  * do any additional check for the buffer number.
  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
 static int zvideo_queue_setup(struct vb2_queue *vq, const void *parg,
 		unsigned int *nbuffers, unsigned int *nplanes,
 		unsigned int sizes[], void *alloc_ctxs[])
@@ -958,6 +973,31 @@ static int zvideo_queue_setup(struct vb2_queue *vq, const void *parg,
 
 	return 0;
 }
+#else
+/*
+	int (*queue_setup)(struct vb2_queue *q,
+		   unsigned int *num_buffers, unsigned int *num_planes,
+		   unsigned int sizes[], struct device *alloc_devs[]);
+
+
+*/
+static int zvideo_queue_setup(struct vb2_queue *vq,
+		unsigned int *nbuffers, unsigned int *nplanes,
+		unsigned int sizes[], struct device *alloc_ctxs[])
+{
+	zynq_video_t *zvideo = vb2_get_drv_priv(vq);
+	zynq_dev_t *zdev = zvideo->zdev;
+
+	zynq_trace(ZYNQ_TRACE_PROBE, "%d vid%d %s: vq=0x%p\n",
+	    zdev->zdev_inst, zvideo->index, __FUNCTION__, vq);
+
+	*nplanes = 1;
+
+	sizes[0] = zvideo->format.sizeimage;
+
+	return 0;
+}
+#endif
 
 /*
  * Initialize the buffer right after the allocation.

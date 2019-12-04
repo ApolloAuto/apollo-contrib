@@ -218,7 +218,11 @@ static int zynq_fw_tx_user(zynq_dev_t *zdev, ioc_zynq_fw_upload_t *ioc_arg)
 		if (ret) {
 			/* checking timeout */
 			ktime_now = ktime_get();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 			if (ktime_now.tv64 < ktime_end.tv64) {
+#else
+			if (ktime_now < ktime_end) {
+#endif
 				msleep(1);
 				continue;
 			}

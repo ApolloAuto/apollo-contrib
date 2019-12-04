@@ -848,7 +848,11 @@ retry:
 			/* checking timeout */
 			if (ret == BCAN_DEV_BUSY) {
 				ktime_now = ktime_get();
-				if (ktime_now.tv64 < ktime_end.tv64) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+				if (ktime_now.tv64 < ktime_end.tv64) {	/* } */
+#else
+				if (ktime_now < ktime_end) {
+#endif
 					usleep_range(ZCAN_PIO_WAIT_US_MIN,
 					    ZCAN_PIO_WAIT_US_MAX);
 					goto retry;
