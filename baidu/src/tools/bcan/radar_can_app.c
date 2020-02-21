@@ -155,7 +155,7 @@ static long timespec_diff(struct timespec *start, struct timespec *end)
 		(end->tv_nsec - end->tv_nsec)) / 1000000000L;
 }
 
-inline void print_statistics(uint64_t num_msg)
+void print_statistics(uint64_t num_msg)
 {
 	struct timespec stats_time_now = {0, 0};
 	long timediff_sec_last;
