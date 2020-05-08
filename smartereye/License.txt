@@ -1,0 +1,29 @@
+/************************************************************************
+ *
+ *  Copyright (c) 2018 - 2024 by Beijing Smarter Eye Technology Co.Ltd
+ *
+ *  This software is copyrighted by and is the sole property of
+ *  Beijing Smarter Eye Technology Co.Ltd.  All rights, title,
+ *  ownership, or other interests in the software remain the property
+ *  of Beijing Smarter Eye Technology Co.Ltd. This software may only be
+ *  used in accordance with the corresponding license agreement.  Any
+ *  unauthorized use, duplication, transmission, distribution, or
+ *  disclosure of this software is expressly forbidden.
+ *
+ *  This Copyright notice may not be removed or modified without prior
+ *  written consent of Beijing Smarter Eye Technology Co.Ltd.
+ *
+ *  Beijing Smarter Eye Technology Co.Ltd, reserves the right to modify
+ *  this software without notice.
+ *
+ *  Beijing Smarter Eye Technology Co.Ltd          Tel. 010-59231480
+ *  Beijing                                        http://www.smartereye.com
+ *  Beijing                                        ran.meng@smartereye.com
+ *
+ *************************************************************************/
+
+Distributed with Apollo with permission from Beijing Smarter Eye Technology Co.Ltd.
+
+For any copyright & licensing agreement of using Beijing Smarter Eye Technology
+Co.Ltd contributed code/programs, please contact Beijing Smarter Eye Technology
+Co.Ltd directly.
