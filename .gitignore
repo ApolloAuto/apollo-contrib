@@ -1,3 +1,37 @@
+# Git
+*.orig
+
+# CMake
+CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+CMakeCache.txt
+Makefile
+install_manifest.txt
+
+# Jetbrains
+cmake-build-debug/
+.idea/
+.externalNativeBuild/
+*.cbp
+*.iml
+
+# Editors
+.vscode/
+*.swp
+*~
+
+# NFS
+.nfs*
+
+# Custom
+build/
+devel/
+output/
+nohup.out
+/obu/vendor/
+/obu/third_party/
+
 # Prerequisites
 *.d
 

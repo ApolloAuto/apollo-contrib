@@ -32,8 +32,12 @@ class V2xDb {
   // const static uint32_t map_appid = 29;
   // const static uint32_t spat_appid = 30;
   // const static uint32_t g_max_buf_max = 1000;
-  V2xDb(){};
-  ~V2xDb();
+  V2xDb() = default;
+  ~V2xDb() {
+    delete spat_;
+    delete map_;
+    delete ssm_;
+  };
   void V2xDbInit();
   void SubmitData(char* buf, uint32_t len, uint32_t appid);
   bool GetData(char* buf, uint32_t* len, eMsgType type);
@@ -41,6 +45,7 @@ class V2xDb {
  private:
   V2xTable* spat_ = nullptr;
   V2xTable* map_ = nullptr;
+  V2xTable* ssm_ = nullptr;
 };
 typedef SingletonService<V2xDb> V2xDbSingleton;
 }  // namespace v2x

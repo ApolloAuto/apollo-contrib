@@ -38,6 +38,7 @@ typedef enum _eMsgType_ {
   MSG_TYPE_RSM,
   MSG_TYPE_MAP,
   MSG_TYPE_SPAT,
+  MSG_TYPE_SSM,
   MSG_TYPE_MAX
 } eMsgType;
 

@@ -20,8 +20,10 @@
  */
 
 #include "v2x_db.h"
+
 #include <cstring>
 #include <iostream>
+
 #include "glog/logging.h"
 #include "network_adapter/pc5/adapter_pc5.h"
 #include "v2x_data.h"
@@ -32,6 +34,7 @@ namespace v2x {
 void V2xDb::V2xDbInit() {
   spat_ = new V2xTable(true, 5);
   map_ = new V2xTable(false, 5);
+  ssm_ = new V2xTable(true, 5);
 }
 
 void V2xDb::SubmitData(char* buf, uint32_t len, uint32_t appid) {
@@ -70,9 +73,15 @@ void V2xDb::SubmitData(char* buf, uint32_t len, uint32_t appid) {
   } else if (MSG_TYPE_SPAT == GetMsgType(appid)) {  // spat message
     data = new V2xData(buf, len);
     if (!spat_->AddEntryWithCompare(*data)) {
-       delete data;
-    } 
+      delete data;
+    }
     LOG(INFO) << "submit the SPAT message to table";
+  } else if (MSG_TYPE_SSM == GetMsgType(appid)) {  // ssm message
+    data = new V2xData(buf, len);
+    if (!ssm_->AddEntryWithCompare(*data)) {
+      delete data;
+    }
+    LOG(INFO) << "submit the SSM message to table";
   } else {
     delete[] buf;
     LOG(INFO) << "appid is wrong, appid " << appid;
@@ -85,6 +94,8 @@ bool V2xDb::GetData(char* buf, uint32_t* len, eMsgType type) {
     data = map_->GetLatestEntry();
   } else if (MSG_TYPE_SPAT == type) {
     data = spat_->GetLatestEntry();
+  } else if (MSG_TYPE_SSM == type) {
+    data = ssm_->GetLatestEntry();
   } else {
     // delete [] buf;
     LOG(INFO) << "type is wrong, appid " << type;
