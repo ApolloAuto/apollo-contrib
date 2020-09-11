@@ -19,6 +19,7 @@
  * @brief main function for OBU
  */
 
+#include <linux/limits.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string>
@@ -33,12 +34,11 @@
 #include "platform_auth/device_info.h"
 #include "proxy/proxy.h"
 #include "scenario/traffic_light/traffic_light_thread.h"
+#include "scenario/shared_sensor/shared_sensor_thread.h"
 #include "v2x_gflags.h"
 
-int32_t gLogLevl = 0;
-
 void log_init() {
-  std::string path(50, '\0');
+  std::string path(PATH_MAX, '\0');
 
   // get the current path
   int cnt = readlink("/proc/self/exe", (char*)path.c_str(), path.size());
@@ -132,6 +132,8 @@ int main(int argc, char** argv) {
 
   v2x::TrafficLightThread* traffic_light_thread = new v2x::TrafficLightThread();
   traffic_light_thread->Start();
+  v2x::SharedSensorThread* shared_sensor_thread = new v2x::SharedSensorThread();
+  shared_sensor_thread->Start();
   bool security_flag = v2x::fLB::FLAGS_security_flag;
   std::string root_ca = v2x::fLS::FLAGS_root_ca;
   std::string self_ca = v2x::fLS::FLAGS_self_ca;
