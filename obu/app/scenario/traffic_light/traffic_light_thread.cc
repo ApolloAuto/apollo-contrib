@@ -20,6 +20,7 @@
  */
 
 #include "traffic_light_thread.h"
+
 #include "database/v2x_db.h"
 #include "glog/logging.h"
 #include "msg_sets/message_set.h"
@@ -129,9 +130,8 @@ void TrafficLightThread::Run() {
       continue;
     }
 
-    std::shared_ptr<apollo::v2x::IntersectionTrafficLightData>
-        intersection_trafficlight_msg(
-            new apollo::v2x::IntersectionTrafficLightData);
+    std::shared_ptr<apollo::v2x::obu::ObuTrafficLight>
+        intersection_trafficlight_msg(new apollo::v2x::obu::ObuTrafficLight);
     ret = tl.TrafficLightApp(map, spat, car_status,
                              intersection_trafficlight_msg);
     if (ret != 0) {

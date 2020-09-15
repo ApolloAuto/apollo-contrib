@@ -22,6 +22,12 @@
 #ifndef APP_PROXY_PROXY_H_
 #define APP_PROXY_PROXY_H_
 
+#include <iostream>
+#include <mutex>
+#include <queue>
+#include <string>
+#include <thread>
+
 #include <grpc/grpc.h>
 #include <grpc/support/log.h>
 #include <grpcpp/channel.h>
@@ -34,17 +40,12 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 
-#include <iostream>
-#include <mutex>
-#include <queue>
-#include <string>
-#include <thread>
-
-#include "app/proto/include/v2x_service_car_to_obu.grpc.pb.h"
-#include "app/proto/include/v2x_service_obu_to_car.grpc.pb.h"
-#include "macro.h"
 #include "cmn_queue.h"
+#include "macro.h"
 #include "singleton.h"
+
+#include "modules/v2x/proto/v2x_service_car_to_obu.grpc.pb.h"
+#include "modules/v2x/proto/v2x_service_obu_to_car.grpc.pb.h"
 
 namespace v2x {
 
@@ -54,9 +55,7 @@ class V2xProxy {
            const std::string& svb_address)
       : service_(rsu_or_obu_address), client_(svb_address) {}
 
-  ~V2xProxy() {
-    StopAll();
-  }
+  ~V2xProxy() { StopAll(); }
 
   void StartAll() {
     ServerStart();
@@ -67,19 +66,14 @@ class V2xProxy {
     client_.Stop();
   }
 
-  void ServerStart() {
-    service_.Start();
-  }
-  void ClientStart() {
-    client_.Start();
-  }
+  void ServerStart() { service_.Start(); }
+  void ClientStart() { client_.Start(); }
 
   std::shared_ptr<apollo::perception::PerceptionObstacles> GetObstacles();
   std::shared_ptr<apollo::v2x::CarStatus> GetCarStatus();
 
-  void SendObstacles(const apollo::perception::PerceptionObstacles& request);
-  void SendTrafficLights(
-      const apollo::v2x::IntersectionTrafficLightData& request);
+  void SendObstacles(const apollo::v2x::V2XObstacles& request);
+  void SendTrafficLights(const apollo::v2x::obu::ObuTrafficLight& request);
 
  private:
   class CarToObuService final : public apollo::v2x::CarToObu::Service {
@@ -90,11 +84,6 @@ class V2xProxy {
     grpc::Status PushCarStatus(grpc::ServerContext* context,
                                const apollo::v2x::CarStatus* request,
                                apollo::v2x::UpdateStatus* response) override;
-
-    grpc::Status PushPerceptionResult(
-        grpc::ServerContext* context,
-        const apollo::perception::PerceptionObstacles* request,
-        apollo::v2x::UpdateStatus* response) override;
 
     void Start();
     void Stop();
@@ -126,14 +115,8 @@ class V2xProxy {
       stub_ = apollo::v2x::ObuToCar::NewStub(channel_);
     }
 
-    void SendPerceptionObstacles(
-        const apollo::perception::PerceptionObstacles& request);
-
-    void SendPerceptionTrafficLight(
-        const apollo::perception::TrafficLightDetection& request);
-
-    void SendV2xTrafficLight(
-        const apollo::v2x::IntersectionTrafficLightData& request);
+    void SendPerceptionObstacles(const apollo::v2x::V2XObstacles& request);
+    void SendV2xTrafficLight(const apollo::v2x::obu::ObuTrafficLight& request);
 
     void Start();
     void Stop();

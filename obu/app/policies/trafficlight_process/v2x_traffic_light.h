@@ -30,18 +30,22 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
 #include <cmath>
 #include <iostream>
 #include <string>
 #include <thread>
 #include <vector>
+
 #include "MapData.h"
 #include "SPAT.h"
-#include "glog/logging.h"
 #include "coordinate_transition/coordinate_transition.h"
-#include "proto/include/v2x_carstatus.pb.h"
-#include "proto/include/v2x_traffic_light.pb.h"
-#include "proto/include/v2x_trafficlight_policy.pb.h"
+#include "glog/logging.h"
+
+#include "modules/v2x/proto/v2x_car_status.pb.h"
+#include "modules/v2x/proto/v2x_obu_traffic_light.pb.h"
+#include "modules/v2x/proto/v2x_traffic_light.pb.h"
+#include "modules/v2x/proto/v2x_traffic_light_policy.pb.h"
 
 // namespace apollo {
 namespace v2x {
@@ -65,14 +69,13 @@ class Trafficlight {
   ErrorInfo TrafficLightApp(
       const MapData_t* map, const SPAT_t* spat,
       const std::shared_ptr<apollo::v2x::CarStatus>& car_status_receive,
-      std::shared_ptr<::apollo::v2x::IntersectionTrafficLightData>&
+      std::shared_ptr<apollo::v2x::obu::ObuTrafficLight>&
           intersection_trafficlight_msg);
   // Function that orientation to the current lane traffic light info
-  bool TrafficLightPolicy(
-      const apollo::v2x::PolicyData& policy_data,
-      const apollo::v2x::CarStatus& car_status,
-      std::shared_ptr<::apollo::v2x::IntersectionTrafficLightData>&
-          intersection_trafficlights);
+  bool TrafficLightPolicy(const apollo::v2x::PolicyData& policy_data,
+                          const apollo::v2x::CarStatus& car_status,
+                          std::shared_ptr<apollo::v2x::obu::ObuTrafficLight>&
+                              intersection_trafficlights);
   // Function that acquisition system timestamp
   double GetSystemTime() {
     struct timeb t;
@@ -81,7 +84,7 @@ class Trafficlight {
   }
   // Function that get the current year
   int GetCurrentYearMoy() {
-    struct tm *local;
+    struct tm* local;
     time_t now;
     now = time(NULL);
     local = localtime(&now);

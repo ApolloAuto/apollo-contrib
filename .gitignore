@@ -64,3 +64,7 @@ nohup.out
 
 # Mac
 *.DS_Store
+
+# Protobuf
+*.pb.h
+*.pb.cc

@@ -42,6 +42,7 @@ include_directories(${v2x_SOURCE_DIR}/utils)
 include_directories(${v2x_SOURCE_DIR}/network/pc5)
 include_directories(${v2x_SOURCE_DIR}/security)
 include_directories(${v2x_SOURCE_DIR}/vendor)
+include_directories(./app/proto-apollo)
 # where to find library
 link_directories(${v2x_SOURCE_DIR}/third_party/glog/lib)
 link_directories(${v2x_SOURCE_DIR}/third_party/gflags/lib)
