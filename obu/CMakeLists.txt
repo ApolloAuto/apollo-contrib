@@ -55,6 +55,7 @@ link_directories(${v2x_SOURCE_DIR}/third_party/curl/lib)
 link_directories(${v2x_SOURCE_DIR}/third_party/cJSON/lib)
 link_directories(${v2x_SOURCE_DIR}/vendor/ctfo)
 link_directories(${v2x_SOURCE_DIR}/vendor/cmcc/lib)
+include_directories(./lib)
 # which subdirectory to compile
 add_subdirectory(app)
 add_subdirectory(utils)
@@ -64,5 +65,5 @@ add_executable(v2x main.cc)
 target_link_libraries(v2x
         ntw_adapter v2x_db tl ssm policy proxy msg_set uu_auth obu_conf cmcc curl JSON glog gpr
         grpc++ protobuf utils proto security cncrypto cert ssl crypto
-        cV2xAppLyr cV2xNtwkLyr selfcomm event pthread config
+        cV2xAppLyr cV2xNtwkLyr selfcomm event pthread config apollo_ssm_decoder
         )
