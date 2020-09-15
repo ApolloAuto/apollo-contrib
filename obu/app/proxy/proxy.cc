@@ -120,16 +120,6 @@ grpc::Status V2xProxy::CarToObuService::PushCarStatus(ServerContext* context,
 
   return grpc::Status::OK;
 }
-/*
-grpc::Status V2xProxy::CarToObuService::PushPerceptionResult(
-    ServerContext* context, const PerceptionObstacles* request,
-    UpdateStatus* response) {
-  perception_obstacles_.push(*request);
-  response->set_updated(false);
-
-  return grpc::Status::OK;
-}
-*/
 std::shared_ptr<CarStatus> V2xProxy::CarToObuService::pop_carstatus() {
   return car_status_.try_pop();
 }

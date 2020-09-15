@@ -73,8 +73,7 @@ class V2xProxy {
   std::shared_ptr<apollo::v2x::CarStatus> GetCarStatus();
 
   void SendObstacles(const apollo::v2x::V2XObstacles& request);
-  void SendTrafficLights(
-      const apollo::v2x::obu::ObuTrafficLight& request);
+  void SendTrafficLights(const apollo::v2x::obu::ObuTrafficLight& request);
 
  private:
   class CarToObuService final : public apollo::v2x::CarToObu::Service {
@@ -85,13 +84,6 @@ class V2xProxy {
     grpc::Status PushCarStatus(grpc::ServerContext* context,
                                const apollo::v2x::CarStatus* request,
                                apollo::v2x::UpdateStatus* response) override;
-
-    /*
-    grpc::Status PushPerceptionResult(
-        grpc::ServerContext* context,
-        const apollo::perception::PerceptionObstacles* request,
-        apollo::v2x::UpdateStatus* response) override;
-    */
 
     void Start();
     void Stop();
@@ -124,12 +116,7 @@ class V2xProxy {
     }
 
     void SendPerceptionObstacles(const apollo::v2x::V2XObstacles& request);
-    /*
-        void SendPerceptionTrafficLight(
-            const apollo::perception::TrafficLightDetection& request);
-    */
-    void SendV2xTrafficLight(
-        const apollo::v2x::obu::ObuTrafficLight& request);
+    void SendV2xTrafficLight(const apollo::v2x::obu::ObuTrafficLight& request);
 
     void Start();
     void Stop();
