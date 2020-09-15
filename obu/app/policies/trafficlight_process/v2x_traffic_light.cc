@@ -25,14 +25,12 @@
 namespace v2x {
 
 Trafficlight::Trafficlight() {}
-void Trafficlight::Init() {
-  current_year_moy_ = GetCurrentYearMoy();
-}
+void Trafficlight::Init() { current_year_moy_ = GetCurrentYearMoy(); }
 
 ErrorInfo Trafficlight::TrafficLightApp(
     const MapData_t* map, const SPAT_t* spat,
     const std::shared_ptr<apollo::v2x::CarStatus>& car_status_receive,
-    std::shared_ptr<::apollo::v2x::IntersectionTrafficLightData>&
+    std::shared_ptr<apollo::v2x::obu::ObuTrafficLight>&
         intersection_trafficlight_msg) {
   apollo::v2x::PolicyData policy_data_pb;
   apollo::v2x::Map* map_pb = policy_data_pb.mutable_map();
@@ -59,7 +57,7 @@ ErrorInfo Trafficlight::TrafficLightApp(
 bool Trafficlight::TrafficLightPolicy(
     const apollo::v2x::PolicyData& policy_data,
     const apollo::v2x::CarStatus& car_status,
-    std::shared_ptr<::apollo::v2x::IntersectionTrafficLightData>&
+    std::shared_ptr<apollo::v2x::obu::ObuTrafficLight>&
         intersection_trafficlights) {
   self_position_x_ = car_status.localization().pose().position().x();
   self_position_y_ = car_status.localization().pose().position().y();
@@ -149,8 +147,8 @@ bool Trafficlight::TrafficLightPolicy(
           intersection_state.has_time_stamp_dsecond()) {
         present_moy_ = intersection_state.moy();
         present_dsecond_ = intersection_state.time_stamp_dsecond();
-        timestamp_ =
-            (present_moy_ + current_year_moy_) * 60 + static_cast<double>(present_dsecond_ / 1000.0);
+        timestamp_ = (present_moy_ + current_year_moy_) * 60 +
+                     static_cast<double>(present_dsecond_ / 1000.0);
         if (!(present_moy_ >= previous_moy_ &&
               present_dsecond_ >= previous_dsecond_)) {
           previous_moy_ = present_moy_;
@@ -169,14 +167,7 @@ bool Trafficlight::TrafficLightPolicy(
       msg_header->set_sequence_num(sequence_num_);
       msg_header->set_module_name("v2x");
       // Add current_lane_trafficlight information
-      apollo::v2x::CurrentLaneTrafficLight* current_lane_trafficlight =
-          intersection_trafficlights->mutable_current_lane_trafficlight();
-      current_lane_trafficlight->set_gps_x_m(
-          lane_current.position_offset(lane_current.position_offset_size() - 1)
-              .x());
-      current_lane_trafficlight->set_gps_y_m(
-          lane_current.position_offset(lane_current.position_offset_size() - 1)
-              .y());
+      auto* road_tl1 = intersection_trafficlights->add_road_traffic_light();
       for (int n = 0; n < intersection_state.phases_size(); n++) {
         const ::apollo::v2x::Phase& intersection_phase =
             intersection_state.phases(n);
@@ -218,8 +209,16 @@ bool Trafficlight::TrafficLightPolicy(
                         << std::endl;
             }
             // Add single_trafficlight information
-            apollo::v2x::SingleTrafficLight* single_trafficlight =
-                current_lane_trafficlight->add_single_traffic_light();
+            auto* lane_tl1 = road_tl1->add_lane_traffic_light();
+            lane_tl1->set_gps_x_m(
+                lane_current
+                    .position_offset(lane_current.position_offset_size() - 1)
+                    .x());
+            lane_tl1->set_gps_y_m(
+                lane_current
+                    .position_offset(lane_current.position_offset_size() - 1)
+                    .y());
+            auto* single_trafficlight = lane_tl1->add_single_traffic_light();
             // switch (connections_data.allow_driving_behavior()) {
             // case ::apollo::v2x::Connection::STRAIGHT:
             //     single_trafficlight->add_trafficlight_type(

@@ -23,6 +23,7 @@
 
 #include <cstring>
 
+#include "apollo_ssm_decoder.h"
 #include "database/v2x_db.h"
 #include "glog/logging.h"
 #include "msg_sets/message_set.h"
@@ -47,15 +48,13 @@ void SharedSensorThread::Run() {
     LOG(ERROR) << "memory malloc failed for ssm msg buf";
     return;
   }
-  // TODO(qiumiaohan) change to v2x obstacles
-  auto v2x_obstacles =
-      std::make_shared<apollo::perception::PerceptionObstacles>();
+  auto v2x_obstacles = std::make_shared<apollo::v2x::V2XObstacles>();
   if (!v2x_obstacles) {
     LOG(ERROR) << "failed to create obstacles";
     return;
   }
   while (1) {
-    v2x_obstacles.Clear();
+    v2x_obstacles->Clear();
     ssm_buf_len = mtu;
     std::memset(ssm_buf, 0, ssm_buf_len);
     // Read the ssm message
@@ -65,9 +64,15 @@ void SharedSensorThread::Run() {
       continue;
     }
     LOG(INFO) << "recieved the ssm message with " << ssm_buf_len;
-    // TODO(qiumiaohan) decode message(ssm_buf[ssm_buf_len])
-    // TODO(qiumiaohan) parse from string
-    // v2x_obstacles->ParseFromString
+    std::string proto_str;
+    if (::apollo::v2x::obu::conv::DecodeSSM(ssm_buf, ssm_buf_len, &proto_str)) {
+      LOG(ERROR) << "Failed to decode SSM";
+      continue;
+    }
+    if (!v2x_obstacles->ParsePartialFromString(proto_str)) {
+      LOG(ERROR) << "Failed to call ParsePartialFromString";
+      continue;
+    }
     grpc->SendObstacles(*v2x_obstacles);
   }
   delete[] ssm_buf;

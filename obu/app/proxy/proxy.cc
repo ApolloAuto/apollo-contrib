@@ -20,6 +20,7 @@
  */
 
 #include "app/proxy/proxy.h"
+
 #include "glog/logging.h"
 namespace v2x {
 
@@ -119,7 +120,7 @@ grpc::Status V2xProxy::CarToObuService::PushCarStatus(ServerContext* context,
 
   return grpc::Status::OK;
 }
-
+/*
 grpc::Status V2xProxy::CarToObuService::PushPerceptionResult(
     ServerContext* context, const PerceptionObstacles* request,
     UpdateStatus* response) {
@@ -128,7 +129,7 @@ grpc::Status V2xProxy::CarToObuService::PushPerceptionResult(
 
   return grpc::Status::OK;
 }
-
+*/
 std::shared_ptr<CarStatus> V2xProxy::CarToObuService::pop_carstatus() {
   return car_status_.try_pop();
 }
@@ -147,7 +148,7 @@ std::shared_ptr<PerceptionObstacles> V2xProxy::GetObstacles() {
 }
 
 void V2xProxy::ObuToCarClient::SendPerceptionObstacles(
-    const PerceptionObstacles& request) {
+    const apollo::v2x::V2XObstacles& request) {
   AsyncClientCall* call = new AsyncClientCall;
   call->response_reader = stub_->PrepareAsyncSendPerceptionObstacles(
       &call->context, request, cq_.get());
@@ -156,12 +157,12 @@ void V2xProxy::ObuToCarClient::SendPerceptionObstacles(
                                 static_cast<void*>(call));
 }
 
-void V2xProxy::SendObstacles(const PerceptionObstacles& request) {
+void V2xProxy::SendObstacles(const apollo::v2x::V2XObstacles& request) {
   client_.SendPerceptionObstacles(request);
 }
 
 void V2xProxy::ObuToCarClient::SendV2xTrafficLight(
-    const IntersectionTrafficLightData& request) {
+    const apollo::v2x::obu::ObuTrafficLight& request) {
   AsyncClientCall* call = new AsyncClientCall;
   call->response_reader = stub_->PrepareAsyncSendV2xTrafficLight(
       &call->context, request, cq_.get());
@@ -170,7 +171,8 @@ void V2xProxy::ObuToCarClient::SendV2xTrafficLight(
                                 static_cast<void*>(call));
 }
 
-void V2xProxy::SendTrafficLights(const IntersectionTrafficLightData& request) {
+void V2xProxy::SendTrafficLights(
+    const apollo::v2x::obu::ObuTrafficLight& request) {
   client_.SendV2xTrafficLight(request);
 }
 
