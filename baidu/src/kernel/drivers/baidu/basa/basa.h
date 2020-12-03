@@ -111,8 +111,13 @@ typedef struct zynq_dev {
 	struct tasklet_struct	zdev_ta[ZYNQ_INT_PER_CARD];
 
 	struct completion	zdev_gpspps_event_comp;
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 	struct timespec		zdev_gps_ts_first;
 	struct timespec		zdev_gps_ts;	/* last valid GPS timestamp */
+#else
+	struct timespec64	zdev_gps_ts_first;
+	struct timespec64	zdev_gps_ts;	/* last valid GPS timestamp */
+#endif
 	unsigned int		zdev_gps_smoothing;
 	unsigned int		zdev_gps_cnt;
 	long			zdev_sys_drift;

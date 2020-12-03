@@ -29,7 +29,7 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 	#include <linux/sched.h>
 #else
-	#include <linux/sched/types.h>
+	#include <uapi/linux/sched/types.h>
 #endif
 
 static zynq_dev_t *zynq_gps_master_dev = NULL;
@@ -138,7 +138,11 @@ static int zynq_get_gprmc(zynq_dev_t *zdev, u32 *gprmc_val)
 /*
  * convert the GPS time from FPGA registers to "struct timespec"
  */
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 static void zynq_gps_time_ts(u32 *gps_val, struct timespec *ts)
+#else
+static void zynq_gps_time_ts(u32 *gps_val, struct timespec64 *ts)
+#endif
 {
 	ts->tv_sec = mktime(2000 + (gps_val[2] & 0xff),
 	    (gps_val[2] & 0xff00) >> 8, (gps_val[2] & 0xff0000) >> 16,
@@ -149,16 +153,29 @@ static void zynq_gps_time_ts(u32 *gps_val, struct timespec *ts)
 	    ((gps_val[0] >> 20) & 0xfff) * NSEC_PER_MSEC;
 }
 
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
+#else
+static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec64 *ts)
+#endif
 {
 	u32 gps_val[3];
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 	struct timespec ts_sys;
+#else
+	struct timespec64 ts_sys;
+#endif
+
 	int diff;
 	int delay;
 	int thresh;
 
 	if (zdev->zdev_gps_cnt & 0x1) {
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 		ktime_get_real_ts(&ts_sys);
+#else
+		ktime_get_real_ts64(&ts_sys);
+#endif
 		if (zynq_get_gps_time(zdev, gps_val)) {
 			return -1;
 		}
@@ -166,7 +183,11 @@ static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
 		if (zynq_get_gps_time(zdev, gps_val)) {
 			return -1;
 		}
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 		ktime_get_real_ts(&ts_sys);
+#else
+		ktime_get_real_ts64(&ts_sys);
+#endif
 	}
 
 	zynq_gps_time_ts(gps_val, ts);
@@ -180,10 +201,10 @@ static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
 	}
 
 	zynq_trace(ZYNQ_TRACE_GPS,
-	    "%d SYS time: %ld.%09ld, %s time: %ld.%09ld, %dus\n",
-	    zdev->zdev_inst, ts_sys.tv_sec, ts_sys.tv_nsec,
+	    "%d SYS time: %lld.%09ld, %s time: %lld.%09ld, %dus\n",
+	    zdev->zdev_inst, (s64)ts_sys.tv_sec, ts_sys.tv_nsec,
 	    (gps_val[0] & ZYNQ_GPS_TIME_VALID) ? "GPS" : "FPGA",
-	    ts->tv_sec, ts->tv_nsec, diff);
+	    (s64)ts->tv_sec, ts->tv_nsec, diff);
 
 	if (zdev->zdev_gps_smoothing) {
 		return 0;
@@ -208,11 +229,11 @@ static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
 	/* Firstly find the delay since the last successful sync in seconds */
 	delay = ts->tv_sec - zdev->zdev_gps_ts.tv_sec;
 	if (delay < 0) {
-		zynq_err("%d WARNING! SYS time: %ld.%09ld, %s time: %ld.%09ld, "
-		    "Last sync time: %ld.%09ld, abnormal time jump.\n",
-		    zdev->zdev_inst, ts_sys.tv_sec, ts_sys.tv_nsec,
+		zynq_err("%d WARNING! SYS time: %lld.%09ld, %s time: %lld.%09ld, "
+		    "Last sync time: %lld.%09ld, abnormal time jump.\n",
+		    zdev->zdev_inst, (s64)ts_sys.tv_sec, ts_sys.tv_nsec,
 		    (gps_val[0] & ZYNQ_GPS_TIME_VALID) ? "GPS" : "FPGA",
-		    ts->tv_sec, ts->tv_nsec,
+		    (s64)ts->tv_sec, ts->tv_nsec,
 		    zdev->zdev_gps_ts.tv_sec, zdev->zdev_gps_ts.tv_nsec);
 		return 0;
 	}
@@ -220,22 +241,22 @@ static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
 	/* Check the high water mark in usec */
 	thresh = zynq_gps_high_factor * delay;
 	if ((diff > thresh) || (diff < -thresh)) {
-		zynq_err("%d WARNING! SYS time: %ld.%09ld, %s time: %ld.%09ld, "
+		zynq_err("%d WARNING! SYS time: %lld.%09ld, %s time: %lld.%09ld, "
 		    "gap %dus exceeds high threshold %dus.\n",
-		    zdev->zdev_inst, ts_sys.tv_sec, ts_sys.tv_nsec,
+		    zdev->zdev_inst, (s64)ts_sys.tv_sec, ts_sys.tv_nsec,
 		    (gps_val[0] & ZYNQ_GPS_TIME_VALID) ? "GPS" : "FPGA",
-		    ts->tv_sec, ts->tv_nsec, diff, thresh);
+		    (s64)ts->tv_sec, ts->tv_nsec, diff, thresh);
 		return 0;
 	}
 
 	/* Check the low water mark in usec */
 	thresh = zynq_gps_low_factor * delay;
 	if ((diff > thresh) || (diff < -thresh)) {
-		zynq_err("%d WARNING! SYS time: %ld.%09ld, %s time: %ld.%09ld, "
+		zynq_err("%d WARNING! SYS time: %lld.%09ld, %s time: %lld.%09ld, "
 		    "gap %dus exceeds low threshold %dus.\n",
-		    zdev->zdev_inst, ts_sys.tv_sec, ts_sys.tv_nsec,
+		    zdev->zdev_inst, (s64)ts_sys.tv_sec, ts_sys.tv_nsec,
 		    (gps_val[0] & ZYNQ_GPS_TIME_VALID) ? "GPS" : "FPGA",
-		    ts->tv_sec, ts->tv_nsec, diff, thresh);
+		    (s64)ts->tv_sec, ts->tv_nsec, diff, thresh);
 	}
 
 	return 0;
@@ -243,7 +264,12 @@ static int zynq_gps_ts_check(zynq_dev_t *zdev, struct timespec *ts)
 
 static int zynq_do_gps_sync(zynq_dev_t *zdev)
 {
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 	struct timespec ts;
+#else
+	struct timespec64 ts;
+#endif
+
 	int ret;
 
 	/* get current GPS time */
@@ -252,7 +278,12 @@ static int zynq_do_gps_sync(zynq_dev_t *zdev)
 	}
 
 	/* update system time */
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 	if ((ret = do_settimeofday(&ts))) {
+#else
+	if ((ret = do_settimeofday64(&ts))) {
+#endif
+
 		zynq_err("%d %s: failed to set system time. GPS sync aborted\n",
 		    zdev->zdev_inst, __FUNCTION__);
 		return ret;
@@ -353,7 +384,12 @@ static void zynq_gps_thread_fini(zynq_dev_t *zdev)
 
 static int zynq_gps_init_fpga_time(zynq_dev_t *zdev)
 {
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 	struct timespec ts = { 0 };
+#else
+	struct timespec64 ts = { 0 };
+#endif
+
 	struct tm t;
 	u32 gps_val[3];
 	u32 val;
@@ -377,12 +413,21 @@ static int zynq_gps_init_fpga_time(zynq_dev_t *zdev)
 	}
 
 	/* Get the current system time */
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 	ktime_get_real_ts(&ts);
-	zynq_log("%d %s: init FPGA time with SYS time: %ld.%09ld\n",
-	    zdev->zdev_inst, __FUNCTION__, ts.tv_sec, ts.tv_nsec);
+#else
+	ktime_get_real_ts64(&ts);
+#endif
+
+	zynq_log("%d %s: init FPGA time with SYS time: %lld.%09ld\n",
+	    zdev->zdev_inst, __FUNCTION__, (s64)ts.tv_sec, ts.tv_nsec);
 
 	/* Get the broken-down time from the Epoch time */
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 	time_to_tm(ts.tv_sec, 0, &t);
+#else
+	time64_to_tm(ts.tv_sec, 0, &t);
+#endif
 
 	/* Update the FPGA initial time */
 	val = zynq_g_reg_read(zdev, ZYNQ_G_GPS_CONFIG_2);
