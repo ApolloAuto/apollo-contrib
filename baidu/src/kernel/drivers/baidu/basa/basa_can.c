@@ -1328,7 +1328,11 @@ static void zcan_pio_rx_proc(zynq_can_t *zcan)
 		/* read out one message */
 		bmsg = zcan->zcan_buf_rx_msg + rx_tail;
 		/* record the timestamp for the msg */
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 		ktime_get_real_ts((struct timespec *)
+#else
+		ktime_get_real_ts64((struct timespec64 *)
+#endif
 		    (&bmsg->bcan_msg_timestamp));
 		bmsg->bcan_msg_timestamp.tv_usec /= NSEC_PER_USEC;
 		/* CAN msg info */
@@ -1424,8 +1428,11 @@ static void zcan_dma_rx_proc(zynq_can_t *zcan)
 		memcpy(bmsg, msg, msgsz);
 		if (!zcan->zdev->zcan_rx_hw_ts || zynq_disable_can_hw_ts) {
 			/* do S/W timestamp for the msg */
-			ktime_get_real_ts((struct timespec *)
-			    (&bmsg->bcan_msg_timestamp));
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
+			ktime_get_real_ts((struct timespec *)(&bmsg->bcan_msg_timestamp));
+#else
+			ktime_get_real_ts64((struct timespec64 *)(&bmsg->bcan_msg_timestamp));
+#endif
 			bmsg->bcan_msg_timestamp.tv_usec /= NSEC_PER_USEC;
 		}
 		/* CAN msg info */

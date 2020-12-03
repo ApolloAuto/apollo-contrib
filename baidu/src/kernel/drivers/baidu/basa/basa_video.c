@@ -87,7 +87,7 @@ static const char ts_label_fpga[] = "FPGA";
 static void zvideo_set_format(zynq_video_t *zvideo)
 {
 	zynq_dev_t *zdev = zvideo->zdev;
-	unsigned int val; 
+	unsigned int val;
 
 	zvideo->format = zvideo_formats[zynq_video_format];
 	zvideo->meta_header_lines = ZVIDEO_EM_DATA_LINES;
@@ -105,8 +105,8 @@ static void zvideo_set_format(zynq_video_t *zvideo)
 		val = zynq_g_reg_read(zdev, ZYNQ_G_CAM_TRIG_CFG);
 		val &= ~(ZYNQ_G_CAM_FPS_DRIFT_MASK << ZYNQ_G_CAM_FPS_DRIFT_OFFSET);
 		val &= ~(ZYNQ_G_CAM_DELAY_UPDATE_MASK << ZYNQ_G_CAM_DELAY_UPDATE_OFFSET);
-		val = SET_BITS(ZYNQ_G_CAM_FPS_DRIFT, val, 2) | 
-			SET_BITS(ZYNQ_G_CAM_DELAY_UPDATE, val, 10); 
+		val = SET_BITS(ZYNQ_G_CAM_FPS_DRIFT, val, 2) |
+			SET_BITS(ZYNQ_G_CAM_DELAY_UPDATE, val, 10);
 		zynq_g_reg_write(zdev, ZYNQ_G_CAM_TRIG_CFG, val);
 		spin_unlock(&zdev->zdev_lock);
 	}
@@ -2461,9 +2461,14 @@ void zvideo_err_proc(zynq_video_t *zvideo, int ch_err_status)
 
 void zvideo_get_timestamp(struct timeval *tv)
 {
+#if KERNEL_VERSION(4, 20, 0) > LINUX_VERSION_CODE
 	struct timespec ts;
-
 	ktime_get_real_ts(&ts);
+#else
+	struct timespec64 ts;
+	ktime_get_real_ts64(&ts);
+#endif
+
 	tv->tv_sec = ts.tv_sec;
 	tv->tv_usec = ts.tv_nsec / NSEC_PER_USEC;
 }
