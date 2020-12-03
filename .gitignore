@@ -68,3 +68,13 @@ nohup.out
 # Protobuf
 *.pb.h
 *.pb.cc
+
+# Kernel module objects
+.*.o.cmd
+.*.ko.cmd
+.*.mod.cmd
+*.ko
+*.mod.c
+Module.symvers
+modules.order
+
