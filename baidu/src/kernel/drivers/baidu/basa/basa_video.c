@@ -1860,6 +1860,7 @@ int zvideo_register_vdev(zynq_video_t *zvideo)
 
 	memset(vdev, 0, sizeof(struct video_device));
 
+    vdev->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING;
 	strlcpy(vdev->name, zvideo->caps.name, sizeof(vdev->name));
 	/*
 	 * There is nothing to clean up, so release is set to an empty release
