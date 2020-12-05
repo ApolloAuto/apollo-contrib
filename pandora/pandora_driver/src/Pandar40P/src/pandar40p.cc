@@ -41,7 +41,7 @@ Pandar40P::Pandar40P(
 }
 
 /**
- * @brief destructor
+ * @brief deconstructor
  */
 Pandar40P::~Pandar40P() { delete internal_; }
 

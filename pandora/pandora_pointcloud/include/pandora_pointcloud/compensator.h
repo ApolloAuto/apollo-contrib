@@ -24,7 +24,6 @@
 #include <std_msgs/String.h>
 #include <tf2_ros/transform_listener.h>
 #include <Eigen/Eigen>
-#include <string>
 
 namespace apollo {
 namespace drivers {
@@ -32,8 +31,8 @@ namespace pandora {
 
 class Compensator {
  public:
-  Compensator(ros::NodeHandle node, ros::NodeHandle private_nh);
-  virtual ~Compensator() {}
+  Compensator(ros::NodeHandle& node, ros::NodeHandle& private_nh);
+  virtual ~Compensator() = default;
 
  private:
   /**
@@ -46,9 +45,9 @@ class Compensator {
   *   novatel-preprocess broadcast the tf2 transfrom.
   */
   bool query_pose_affine_from_tf2(const double timestamp,
-                                  Eigen::Affine3d* pose);
+                                  Eigen::Affine3d& pose);
   /**
-  * @brief check if message is valid, check width, height, timesatmp.
+  * @brief check if message is valid, check width, height, timestamp.
   *   set timestamp_offset and point data type
   */
   bool check_message(sensor_msgs::PointCloud2ConstPtr msg);
@@ -56,7 +55,7 @@ class Compensator {
   * @brief motion compensation for point cloud
   */
   template <typename Scalar>
-  void motion_compensation(sensor_msgs::PointCloud2::Ptr msg,
+  void motion_compensation(sensor_msgs::PointCloud2::Ptr& msg,
                            const double timestamp_min,
                            const double timestamp_max,
                            const Eigen::Affine3d& pose_min_time,
@@ -65,14 +64,14 @@ class Compensator {
   * @brief get min timestamp and max timestamp from points in pointcloud2
   */
   inline void get_timestamp_interval(
-      sensor_msgs::PointCloud2ConstPtr msg, double* timestamp_min,
-      double* timestamp_max);
+      sensor_msgs::PointCloud2ConstPtr msg, double& timestamp_min,
+      double& timestamp_max);
   /**
   * @brief get point field size by sensor_msgs::datatype
   */
   inline uint get_field_size(const int data_type);
 
-  // subsrcibe pandora pointcloud2 msg.
+  // subscribe pandora pointcloud2 msg.
   ros::Subscriber pointcloud_sub_;
   // publish point cloud2 after motion compensation
   ros::Publisher compensation_pub_;

@@ -171,17 +171,26 @@ void PandoraClientHeartBeatTask(void* handle) {
     return;
   }
   int ret = 0;
+  
 
   while (!client->exit) {
-    if (-1 == client->cliSocket) {
+    int clifd = -1;
+
+    pthread_mutex_lock(&client->cliSocketLock);
+    if(client->cliSocket != -1) {
+      clifd = client->cliSocket;
+    } else {
+      pthread_mutex_unlock(&client->cliSocketLock);
       sleep(1);
       continue;
     }
-    ret = select_fd(client->cliSocket, 1, WAIT_FOR_WRITE);
+    pthread_mutex_unlock(&client->cliSocketLock);
+
+    ret = select_fd(clifd, 1, WAIT_FOR_WRITE);
     if (ret > 0) {
-      ret = write(client->cliSocket, "HEARTBEAT", strlen("HEARTBEAT"));
+      ret = write(clifd, "HEARTBEAT", strlen("HEARTBEAT"));
       if (ret < 0) {
-        printf("Write Error\n");
+        // printf("Write Error\n");
       }
     }
 
@@ -296,7 +305,7 @@ void PandoraClientTask(void* handle) {
         continue;
       }
 
-      // check the desired frame position packet.
+      // check the desired frame postion packet.
       if (pic->header.position != client->position[pic->header.pic_id]) {
         client->position[pic->header.pic_id] = 0;
         free(pic->yuv);

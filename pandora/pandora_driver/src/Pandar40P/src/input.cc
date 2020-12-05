@@ -32,9 +32,7 @@ namespace drivers {
 namespace hesai {
 
 Input::Input(uint16_t port, uint16_t gpsPort) {
-  socketForGPS = -1;
   socketForLidar = -1;
-
   socketForLidar = socket(PF_INET, SOCK_DGRAM, 0);
   if (socketForLidar == -1) {
     perror("socket");  // TODO(Philip.Pi): perror errno.
@@ -63,6 +61,7 @@ Input::Input(uint16_t port, uint16_t gpsPort) {
     return;
   }
   // gps socket
+  socketForGPS = -1;
   socketForGPS = socket(PF_INET, SOCK_DGRAM, 0);
   if (socketForGPS == -1) {
     perror("socket");  // TODO(Philip.Pi): perror errno.
@@ -128,7 +127,7 @@ int Input::getPacket(PandarPacket *pkt) {
   }
 
   senderAddressLen = sizeof(senderAddress);
-  ssize_t nbytes = 0;
+  ssize_t nbytes;
   for (int i = 0; i != socketNumber; ++i) {
     if (fds[i].revents & POLLIN) {
       nbytes = recvfrom(fds[i].fd, &pkt->data[0], ETHERNET_MTU, 0,

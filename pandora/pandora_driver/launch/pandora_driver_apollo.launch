@@ -8,8 +8,8 @@
 	<arg name="timezone"  default="8"/>
 	<arg name="frame_id"  default="velodyne64"/>
 	<arg name="lidar_topic"  default="/apollo/sensor/velodyne64/PointCloud2"/>
-	<arg name="camera0_topic"  default="/apollo/sensor/pandora/camera/front_color"/>
-	<arg name="camera1_topic"  default="/apollo/sensor/pandora/camera/front_gray"/>
+	<arg name="camera0_topic"  default="/apollo/sensor/camera/traffic/image_long"/>
+	<arg name="camera1_topic"  default="/apollo/sensor/camera/traffic/image_short"/>
 	<arg name="camera2_topic"  default="/apollo/sensor/pandora/camera/right_gray"/>
 	<arg name="camera3_topic"  default="/apollo/sensor/pandora/camera/back_gray"/>
 	<arg name="camera4_topic"  default="/apollo/sensor/pandora/camera/left_gray"/>

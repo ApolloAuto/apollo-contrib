@@ -17,7 +17,6 @@
 #ifndef SRC_PANDAR40P_INTERNAL_H_
 #define SRC_PANDAR40P_INTERNAL_H_
 
-#include <boost/function.hpp>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pthread.h>
@@ -26,11 +25,11 @@
 #include <list>
 #include <string>
 
+#include <boost/function.hpp>
+
 #include "pandar40p/point_types.h"
 #include "src/input.h"
 
-#define RATE_PER_PACKET (2)
-#define PACKETS_PER_ROUND (360 / RATE_PER_PACKET)
 #define SOB_ANGLE_SIZE (4)
 #define RAW_MEASURE_SIZE (3)
 #define LASER_COUNT (40)
@@ -43,7 +42,7 @@
 #define REVOLUTION_SIZE (2)
 #define INFO_SIZE                                                  \
   (TIMESTAMP_SIZE + FACTORY_INFO_SIZE + ECHO_SIZE + RESERVE_SIZE + \
-  REVOLUTION_SIZE)
+   REVOLUTION_SIZE)
 #define UTC_TIME (6)
 #define PACKET_SIZE (BLOCK_SIZE * BLOCKS_PER_PACKET + INFO_SIZE + UTC_TIME)
 #define LASER_RETURN_TO_DISTANCE_RATE (0.004)
@@ -112,7 +111,7 @@ class Pandar40P_Internal {
    *        type       				The device type
    */
   Pandar40P_Internal(
-      const std::string &device_ip, uint16_t lidar_port, uint16_t gps_port,
+      std::string device_ip, uint16_t lidar_port, uint16_t gps_port,
       boost::function<void(boost::shared_ptr<PPointCloud>, double)>
           pcl_callback,
       boost::function<void(double)> gps_callback, uint16_t start_angle, int tz,
@@ -122,10 +121,10 @@ class Pandar40P_Internal {
    * @brief load the correction file
    * @param correction The path of correction file
    */
-  int LoadCorrectionFile(const std::string &correction);
+  int LoadCorrectionFile(std::string correction);
 
   /**
-   * @brief reset the start angle.
+   * @brief load the correction file
    * @param angle The start angle
    */
   void ResetStartAngle(uint16_t start_angle);
@@ -151,8 +150,7 @@ class Pandar40P_Internal {
   boost::thread *lidar_process_thr_;
   bool enable_lidar_recv_thr_;
   bool enable_lidar_process_thr_;
-  int start_angle_ = 0;
-  double timestamp_ = 0;
+  int start_angle_;
 
   std::list<struct PandarPacket_s> lidar_packets_;
 
@@ -163,6 +161,8 @@ class Pandar40P_Internal {
 
   float sin_lookup_table_[ROTATION_MAX_UNITS];
   float cos_lookup_table_[ROTATION_MAX_UNITS];
+
+  uint16_t last_azimuth_;
 
   float elev_angle_map_[LASER_COUNT];
   float horizatal_azimuth_offset_map_[LASER_COUNT];
